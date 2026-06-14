@@ -4,6 +4,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from .config import DataConfig
+
 _GEN_RE = re.compile(r"^gen(\d+)_")
 
 
@@ -51,3 +53,46 @@ def load_records(images_dir, pokemon_id: int,
                 path=folder / row["filename"], smash_pct=smash, total_votes=votes,
             ))
     return recs
+
+
+def relax_priority(rec: "ImageRecord") -> tuple[int, int]:
+    """Lower sorts first: portraits, then newest in-game gen, then animated."""
+    if rec.category == "portrait":
+        return (0, 0)
+    if rec.category == "in-game":
+        return (1, -rec.gen)
+    return (2, 0)
+
+
+def _passes(rec: "ImageRecord", cfg: DataConfig) -> bool:
+    s = cfg.selection
+    if s.categories and rec.category not in s.categories:
+        return False
+    if s.names.include and rec.source_name not in s.names.include:
+        return False
+    if rec.source_name in s.names.exclude:
+        return False
+    if rec.gen != 0:
+        if s.gens.include and rec.gen not in s.gens.include:
+            return False
+        if rec.gen in s.gens.exclude:
+            return False
+    return True
+
+
+def select_pokemon(cfg: DataConfig,
+                   records: list["ImageRecord"]) -> tuple[list["ImageRecord"], dict]:
+    kept = [r for r in records if _passes(r, cfg)]
+    excluded = [r for r in records if r not in kept]
+    n_filtered = len(kept)
+    n_relaxed = 0
+    if len(kept) < cfg.minimages and excluded:
+        for r in sorted(excluded, key=relax_priority):
+            if len(kept) >= cfg.minimages:
+                break
+            kept.append(r)
+            n_relaxed += 1
+    padded = len(kept) < cfg.minimages
+    report = {"n_source": len(records), "n_filtered": n_filtered,
+              "n_relaxed": n_relaxed, "n_kept": len(kept), "padded": padded}
+    return kept, report
