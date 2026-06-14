@@ -90,7 +90,8 @@ save_every_epoch   = true          # per-epoch checkpoint; ALL epochs kept, neve
   passed in at construction.
 - `train` mode: `__getitem__(i)` pulls `(img_uint8 HWC RGB, label)` from the
   `DataSampler`, converts to normalized CHW float tensor; returns
-  `(tensor, float_label, pokemon_id)`.
+  `(tensor, float_label)`. (No `pokemon_id` — training does not aggregate
+  per Pokemon; only eval needs the id.)
 - `eval` mode: iterates the val split's rows once (no random augmentation).
   Renders each sprite **canonically**: scale longest side to fit `resolution`,
   center on a white `resolution x resolution` canvas, normalize. Returns
