@@ -52,3 +52,25 @@ def test_validate_rejects_bad_split():
     with pytest.raises(ValueError):
         DataConfig.from_dict({"name": "d", "resolution": 64,
                               "split": {"strategy": "nonsense"}})
+
+
+def test_validate_rejects_bad_resolution():
+    with pytest.raises(ValueError):
+        DataConfig.from_dict({"name": "d", "resolution": 0})
+
+
+def test_validate_rejects_bad_scale_method():
+    with pytest.raises(ValueError):
+        DataConfig.from_dict({"name": "d", "resolution": 8,
+                              "augmentations": {"scale_method": "wat"}})
+
+
+def test_validate_rejects_unknown_category():
+    with pytest.raises(ValueError):
+        DataConfig.from_dict({"name": "d", "resolution": 8,
+                              "selection": {"categories": ["bogus"]}})
+
+
+def test_validate_rejects_flat_below_one():
+    with pytest.raises(ValueError):
+        DataConfig.from_dict({"name": "d", "resolution": 8, "variations": 0})

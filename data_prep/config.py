@@ -5,6 +5,12 @@ CATEGORIES = ("portrait", "in-game", "animated")
 SCALE_METHODS = ("nearest", "bilinear", "bicubic", "lanczos")
 SPLIT_STRATEGIES = ("pokemon", "image")
 
+DEFAULT_SCALE_W = (0.65, 1.10)
+DEFAULT_SCALE_H = (0.65, 1.10)
+DEFAULT_POS_X = (0.10, 0.90)
+DEFAULT_POS_Y = (0.10, 0.90)
+DEFAULT_ROTATION = (-10.0, 10.0)
+
 
 def _pair(v, default):
     if v is None:
@@ -46,14 +52,14 @@ class VariationsCfg:
 
 @dataclass
 class ScaleAugCfg:
-    w: tuple[float, float] = (0.65, 1.10)
-    h: tuple[float, float] = (0.65, 1.10)
+    w: tuple[float, float] = DEFAULT_SCALE_W
+    h: tuple[float, float] = DEFAULT_SCALE_H
 
 
 @dataclass
 class PositionAugCfg:
-    x: tuple[float, float] = (0.10, 0.90)
-    y: tuple[float, float] = (0.10, 0.90)
+    x: tuple[float, float] = DEFAULT_POS_X
+    y: tuple[float, float] = DEFAULT_POS_Y
 
 
 @dataclass
@@ -66,7 +72,7 @@ class AugmentationsCfg:
     scale: ScaleAugCfg = field(default_factory=ScaleAugCfg)
     scale_method: str = "bilinear"
     position: PositionAugCfg = field(default_factory=PositionAugCfg)
-    rotation: tuple[float, float] = (-10.0, 10.0)
+    rotation: tuple[float, float] = DEFAULT_ROTATION
     background: BackgroundCfg = field(default_factory=BackgroundCfg)
 
 
@@ -118,12 +124,12 @@ class DataConfig:
         po = au.get("position", {}) or {}
         bg = au.get("background", {}) or {}
         aug = AugmentationsCfg(
-            scale=ScaleAugCfg(w=_pair(sc.get("w"), (0.65, 1.10)),
-                              h=_pair(sc.get("h"), (0.65, 1.10))),
+            scale=ScaleAugCfg(w=_pair(sc.get("w"), DEFAULT_SCALE_W),
+                              h=_pair(sc.get("h"), DEFAULT_SCALE_H)),
             scale_method=au.get("scale_method", "bilinear"),
-            position=PositionAugCfg(x=_pair(po.get("x"), (0.10, 0.90)),
-                                    y=_pair(po.get("y"), (0.10, 0.90))),
-            rotation=_pair(au.get("rotation"), (-10.0, 10.0)),
+            position=PositionAugCfg(x=_pair(po.get("x"), DEFAULT_POS_X),
+                                    y=_pair(po.get("y"), DEFAULT_POS_Y)),
+            rotation=_pair(au.get("rotation"), DEFAULT_ROTATION),
             background=BackgroundCfg(mode=bg.get("mode", "white")),
         )
 
