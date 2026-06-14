@@ -41,6 +41,7 @@ def evaluate(model, loader, device) -> dict:
     preds = np.concatenate(all_pred)
     trues = np.concatenate(all_true)
     ids = np.concatenate(all_ids)
-    _, mean_pred, true = aggregate_per_pokemon(ids, preds, trues)
+    uniq, mean_pred, true = aggregate_per_pokemon(ids, preds, trues)
     return {"spearman": spearman(mean_pred, true), "mae": mae(mean_pred, true),
-            "n_pokemon": len(true), "val_loss": loss_sum / max(1, n)}
+            "n_pokemon": len(true), "val_loss": loss_sum / max(1, n),
+            "ids": uniq, "y_true": true, "y_pred": mean_pred}

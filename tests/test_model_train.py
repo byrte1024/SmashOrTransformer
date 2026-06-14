@@ -28,9 +28,11 @@ def test_train_smoke(mini_repo, tmp_path):
     assert (run_dir / "checkpoints" / "epoch_001.pt").exists()
     assert (run_dir / "checkpoints" / "epoch_002.pt").exists()
     assert (run_dir / "checkpoints" / "best.pt").exists()
-    rows = list(csv.DictReader(open(run_dir / "history.csv")))
+    with open(run_dir / "history.csv") as f:
+        rows = list(csv.DictReader(f))
     assert len(rows) == 2
     for r in rows:
         assert r["train_loss"] not in ("", "nan")
     summary = json.loads((run_dir / "summary.json").read_text())
     assert "best_epoch" in summary and "best_spearman" in summary
+    assert isinstance(summary["best_spearman"], float)

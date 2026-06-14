@@ -82,12 +82,14 @@ def run(cfg: TrainConfig, pretrained: bool = True) -> Path:
             loss.backward()
             gn = torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
             optimizer.step()
-            loss_sum += float(loss) * len(y); n_samples += len(y)
+            loss_sum += loss.detach().item() * len(y)
+            n_samples += len(y)
             grad_norm_sum += float(gn); n_batches += 1
         scheduler.step()
 
         val = evaluate(model, val_loader, device)
         lrs = [g["lr"] for g in optimizer.param_groups]
+        # grad_norm logged is the per-epoch mean of pre-clip batch gradient norms
         record = {
             "epoch": epoch + 1, "phase": phase,
             "train_loss": loss_sum / max(1, n_samples),
@@ -98,8 +100,7 @@ def run(cfg: TrainConfig, pretrained: bool = True) -> Path:
             "n_train_samples": n_samples, "n_val_pokemon": val["n_pokemon"]}
         logger.log_epoch(record)
 
-        ids, y_true, y_pred = _val_predictions(model, val_loader, device)
-        logger.save_predictions(epoch + 1, ids, y_true, y_pred)
+        logger.save_predictions(epoch + 1, val["ids"], val["y_true"], val["y_pred"])
 
         is_best = val["spearman"] > best_spearman
         if is_best:
@@ -115,18 +116,6 @@ def run(cfg: TrainConfig, pretrained: bool = True) -> Path:
                      "total_seconds": time.perf_counter() - t_start,
                      "epochs": cfg.epochs})
     return logger.run
-
-
-def _val_predictions(model, loader, device):
-    model.eval()
-    ids, y_true, y_pred = [], [], []
-    with torch.no_grad():
-        for t, y, pid in loader:
-            t = t.to(device)
-            p = torch.sigmoid(model(t)).cpu().numpy()
-            for a, b, c in zip(np.asarray(pid), y.numpy(), p):
-                ids.append(int(a)); y_true.append(float(b)); y_pred.append(float(c))
-    return ids, y_true, y_pred
 
 
 def main(argv=None):

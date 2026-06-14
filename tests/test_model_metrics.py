@@ -41,6 +41,7 @@ def test_evaluate_returns_metrics():
             pids.append(pid)
     loader = DataLoader(list(zip(xs, ys, pids)), batch_size=2)
     out = evaluate(_ConstModel(), loader, torch.device("cpu"))
-    assert set(out) == {"spearman", "mae", "n_pokemon", "val_loss"}
+    assert {"spearman", "mae", "n_pokemon", "val_loss", "ids", "y_true", "y_pred"} == set(out)
+    assert len(out["ids"]) == 3 and len(out["y_pred"]) == 3
     assert out["n_pokemon"] == 3
     assert out["spearman"] > 0.9
