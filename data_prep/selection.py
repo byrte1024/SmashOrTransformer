@@ -43,14 +43,18 @@ def load_records(images_dir, pokemon_id: int,
     if not meta.exists():
         return []
     smash, votes = labels.get(pokemon_id, (0.0, 0))
+    _UNSUPPORTED = {".svg"}
     recs: list[ImageRecord] = []
     with open(meta, newline="") as f:
         for row in csv.DictReader(f):
-            name = row["filename"].rsplit(".", 1)[0]
+            fname = row["filename"]
+            if Path(fname).suffix.lower() in _UNSUPPORTED:
+                continue
+            name = fname.rsplit(".", 1)[0]
             recs.append(ImageRecord(
                 pokemon_id=pokemon_id, source_name=name,
                 category=row["category"], gen=gen_of(name),
-                path=folder / row["filename"], smash_pct=smash, total_votes=votes,
+                path=folder / fname, smash_pct=smash, total_votes=votes,
             ))
     return recs
 

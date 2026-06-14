@@ -81,3 +81,20 @@ def prepare(cfg: DataConfig, images_dir, labels_csv, out_root) -> Path:
          "per_pokemon_counts": counts, "selection_reports": reports}, indent=2))
 
     return out
+
+
+def main(argv=None):
+    import argparse
+    p = argparse.ArgumentParser(description="Build a datasets/{name}/ artifact.")
+    p.add_argument("config", help="path to a dataset config JSON")
+    p.add_argument("--images", default="images")
+    p.add_argument("--labels", default="pokesmash_votes.csv")
+    p.add_argument("--out", default="datasets")
+    args = p.parse_args(argv)
+    cfg = DataConfig.from_dict(json.loads(Path(args.config).read_text()))
+    out = prepare(cfg, args.images, args.labels, args.out)
+    print(f"Wrote dataset to {out}")
+
+
+if __name__ == "__main__":
+    main()
