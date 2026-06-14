@@ -46,3 +46,12 @@ def test_prepare_raises_on_empty_selection(mini_repo):
                                 "selection": {"names": {"include": ["does-not-exist"]}}})
     with pytest.raises(ValueError):
         prepare(cfg, mini_repo["images"], mini_repo["labels"], mini_repo["root"] / "datasets")
+
+
+def test_stats_has_label_histogram(mini_repo):
+    cfg = DataConfig.from_dict({"name": "h", "resolution": 16})
+    out = prepare(cfg, mini_repo["images"], mini_repo["labels"], mini_repo["root"] / "datasets")
+    stats = json.loads((out / "stats.json").read_text())
+    assert "label_histogram" in stats
+    assert len(stats["label_histogram"]["counts"]) == 10
+    assert len(stats["label_histogram"]["bins"]) == 11

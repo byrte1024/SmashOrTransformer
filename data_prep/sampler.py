@@ -49,6 +49,10 @@ class DataSampler:
     def pokemon_ids(self) -> set[int]:
         return {int(self._row_pid[r]) for r in self._rows}
 
+    def votes(self, i: int) -> int:
+        """Total smash+pass votes for sample i (for optional confidence weighting)."""
+        return int(self._votes[self._plan[i]])
+
     def __len__(self) -> int:
         return len(self._plan)
 

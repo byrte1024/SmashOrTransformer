@@ -51,3 +51,9 @@ def test_fill_so_balances_samples(mini_repo):
     for pid in (ds._row_pid[r] for r in ds._plan):
         counts[int(pid)] = counts.get(int(pid), 0) + 1
     assert len(set(counts.values())) == 1
+
+
+def test_sampler_votes_accessible(mini_repo):
+    ds = DataSampler(_build(mini_repo), split="train", epoch=0)
+    v = ds.votes(0)
+    assert isinstance(v, int) and v > 0

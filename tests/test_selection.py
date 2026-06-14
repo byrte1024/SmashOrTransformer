@@ -77,3 +77,24 @@ def test_relax_priority_orders_portrait_then_newgen_then_animated():
             mk("gen9_y", "in-game", 9), mk("home", "portrait", 0)]
     ordered = sorted(recs, key=relax_priority)
     assert [r.source_name for r in ordered] == ["home", "gen9_y", "gen1_x", "showdown"]
+
+
+def test_load_records_skips_svg(tmp_path):
+    import csv as _csv
+    from PIL import Image as _Image
+    from data_prep.selection import load_records
+    folder = tmp_path / "images" / "1"
+    folder.mkdir(parents=True)
+    _Image.new("RGBA", (8, 8), (1, 2, 3, 255)).save(folder / "official-artwork.png")
+    (folder / "dream_world.svg").write_text("<svg></svg>")
+    with open(folder / "meta.csv", "w", newline="") as f:
+        w = _csv.DictWriter(f, fieldnames=["filename", "category", "version", "source_url"])
+        w.writeheader()
+        w.writerow({"filename": "official-artwork.png", "category": "portrait",
+                    "version": "official-artwork", "source_url": "x"})
+        w.writerow({"filename": "dream_world.svg", "category": "portrait",
+                    "version": "dream_world", "source_url": "x"})
+    recs = load_records(tmp_path / "images", 1, {1: (0.5, 100)})
+    names = {r.source_name for r in recs}
+    assert "official-artwork" in names
+    assert "dream_world" not in names

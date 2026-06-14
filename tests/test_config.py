@@ -74,3 +74,8 @@ def test_validate_rejects_unknown_category():
 def test_validate_rejects_flat_below_one():
     with pytest.raises(ValueError):
         DataConfig.from_dict({"name": "d", "resolution": 8, "variations": 0})
+
+
+def test_validate_rejects_negative_minimages():
+    with pytest.raises(ValueError):
+        DataConfig.from_dict({"name": "d", "resolution": 8, "minimages": -1})

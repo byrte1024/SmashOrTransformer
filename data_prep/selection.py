@@ -8,6 +8,10 @@ from .config import DataConfig
 
 _GEN_RE = re.compile(r"^gen(\d+)_")
 
+# Pillow cannot open SVG. dream_world sprites are SVG, so they are skipped here
+# and never enter the dataset. To include them, rasterize SVG to PNG upstream.
+_UNSUPPORTED_SUFFIXES = {".svg"}
+
 
 def gen_of(source_name: str) -> int:
     m = _GEN_RE.match(source_name)
@@ -43,12 +47,11 @@ def load_records(images_dir, pokemon_id: int,
     if not meta.exists():
         return []
     smash, votes = labels.get(pokemon_id, (0.0, 0))
-    _UNSUPPORTED = {".svg"}
     recs: list[ImageRecord] = []
     with open(meta, newline="") as f:
         for row in csv.DictReader(f):
             fname = row["filename"]
-            if Path(fname).suffix.lower() in _UNSUPPORTED:
+            if Path(fname).suffix.lower() in _UNSUPPORTED_SUFFIXES:
                 continue
             name = fname.rsplit(".", 1)[0]
             recs.append(ImageRecord(

@@ -145,6 +145,8 @@ class DataConfig:
     def validate(self) -> None:
         if self.resolution <= 0:
             raise ValueError("resolution must be positive")
+        if self.minimages < 0:
+            raise ValueError("minimages must be >= 0")
         if self.split.strategy not in SPLIT_STRATEGIES:
             raise ValueError(f"split.strategy must be one of {SPLIT_STRATEGIES}")
         if self.augmentations.scale_method not in SCALE_METHODS:

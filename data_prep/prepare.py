@@ -76,9 +76,13 @@ def prepare(cfg: DataConfig, images_dir, labels_csv, out_root) -> Path:
     counts: dict[int, int] = {}
     for p in pid_arr:
         counts[p] = counts.get(p, 0) + 1
+    smash_hist_np = np.array(smash_arr, dtype=np.float64)
+    hist_counts, hist_edges = np.histogram(smash_hist_np, bins=10, range=(0.0, 1.0))
     (out / "stats.json").write_text(json.dumps(
         {"n_images": len(images), "n_pokemon": len(counts),
-         "per_pokemon_counts": counts, "selection_reports": reports}, indent=2))
+         "per_pokemon_counts": counts,
+         "label_histogram": {"bins": hist_edges.tolist(), "counts": hist_counts.tolist()},
+         "selection_reports": reports}, indent=2))
 
     return out
 
