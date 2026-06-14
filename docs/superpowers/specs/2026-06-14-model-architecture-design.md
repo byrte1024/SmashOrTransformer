@@ -63,8 +63,7 @@ grad_clip          = 1.0
 num_workers        = 8
 seed               = 0
 device             = "cuda"        # falls back to cpu if unavailable
-save_every_epoch   = true          # per-epoch checkpoint
-keep_last_k        = null          # null = keep all epoch checkpoints; else prune
+save_every_epoch   = true          # per-epoch checkpoint; ALL epochs kept, never auto-deleted
 ```
 
 `validate()`: resolution must equal the dataset's `config.json` resolution
@@ -127,7 +126,7 @@ Writes everything under `out_dir/run_name/`:
 runs/{run_name}/
   config.json                 # resolved TrainConfig + dataset config snapshot + env (torch/cuda/gpu)
   checkpoints/
-    epoch_001.pt ...          # every epoch if save_every_epoch (pruned by keep_last_k)
+    epoch_001.pt ...          # every epoch (all kept, never auto-deleted)
     best.pt                   # best val Spearman so far
     last.pt                   # most recent
   history.csv                 # one row/epoch, columns below
@@ -148,9 +147,9 @@ Each checkpoint (`epoch_*.pt`, `best.pt`, `last.pt`) bundles: `model_state`,
 `RunLogger` API: `log_epoch(record: dict)`, `save_checkpoint(state, epoch,
 is_best)`, `save_predictions(epoch, ids, y_true, y_pred)`, `finalize(summary)`.
 
-Disk note: ViT-Small epoch checkpoints (weights + optimizer states) are roughly
-~260 MB each; 30 epochs ~= 8 GB. `keep_last_k` bounds this while `best.pt` is
-always retained. `runs/` is gitignored.
+Disk note: ALL epoch checkpoints are kept and never auto-deleted (per user
+requirement). ViT-Small epoch checkpoints (weights + optimizer states) are
+roughly ~260 MB each; 30 epochs ~= 8 GB. `runs/` is gitignored.
 
 ### train.py
 
@@ -199,8 +198,8 @@ Unit:
 - `metrics.py`: `aggregate_per_pokemon` averages correctly; `spearman` returns
   1.0 for a monotonic synthetic pair, near 0 for shuffled; `mae` correct.
 - `stats.py`: `RunLogger` writes config.json/history.csv/history.jsonl/
-  predictions/summary.json with expected fields; `keep_last_k` prunes old epoch
-  checkpoints but keeps `best.pt`.
+  predictions/summary.json with expected fields; per-epoch checkpoints accumulate
+  (all kept, none deleted) and `best.pt`/`last.pt` are maintained.
 
 Integration / smoke (CPU, tiny):
 - Build a tiny dataset from the data-prep mini fixture via `prepare`. Run
