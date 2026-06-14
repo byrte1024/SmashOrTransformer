@@ -38,11 +38,13 @@ class TrainConfig:
             raise ValueError("epochs and batch_size must be positive")
         if not (0 <= self.freeze_epochs <= self.epochs):
             raise ValueError("freeze_epochs must be in [0, epochs]")
-        ds_cfg = json.loads((Path(self.dataset_dir) / "config.json").read_text())
-        if int(ds_cfg["resolution"]) != int(self.resolution):
-            raise ValueError(
-                f"resolution {self.resolution} != dataset resolution "
-                f"{ds_cfg['resolution']}")
+        ds_config = Path(self.dataset_dir) / "config.json"
+        if ds_config.exists():   # absent at inference time (deployed checkpoint)
+            ds_cfg = json.loads(ds_config.read_text())
+            if int(ds_cfg["resolution"]) != int(self.resolution):
+                raise ValueError(
+                    f"resolution {self.resolution} != dataset resolution "
+                    f"{ds_cfg['resolution']}")
 
     def to_dict(self) -> dict:
         return asdict(self)

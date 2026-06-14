@@ -54,6 +54,7 @@ def run(cfg: TrainConfig, pretrained: bool = True) -> Path:
     ds_cfg = json.loads((Path(cfg.dataset_dir) / "config.json").read_text())
     logger.write_config({"train_config": cfg.to_dict(), "dataset_config": ds_cfg,
                          "torch": torch.__version__, "cuda": torch.cuda.is_available(),
+                         "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
                          "device": str(device)})
 
     use_amp = cfg.amp and device.type == "cuda"
@@ -110,7 +111,8 @@ def run(cfg: TrainConfig, pretrained: bool = True) -> Path:
                  "scheduler_state": scheduler.state_dict(),
                  "epoch": epoch + 1, "config": cfg.to_dict(), "metrics": val,
                  "torch_rng": torch.get_rng_state(), "numpy_rng": np.random.get_state()}
-        logger.save_checkpoint(state, epoch + 1, is_best)
+        logger.save_checkpoint(state, epoch + 1, is_best,
+                               save_epoch=cfg.save_every_epoch)
 
     logger.finalize({"best_epoch": best_epoch, "best_spearman": best_spearman,
                      "total_seconds": time.perf_counter() - t_start,

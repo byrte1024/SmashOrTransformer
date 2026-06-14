@@ -46,8 +46,10 @@ class RunLogger:
             for i, yt, yp in zip(ids, y_true, y_pred):
                 w.writerow([int(i), float(yt), float(yp)])
 
-    def save_checkpoint(self, state: dict, epoch: int, is_best: bool) -> None:
-        torch.save(state, self.ckpt_dir / f"epoch_{epoch:03d}.pt")
+    def save_checkpoint(self, state: dict, epoch: int, is_best: bool,
+                        save_epoch: bool = True) -> None:
+        if save_epoch:
+            torch.save(state, self.ckpt_dir / f"epoch_{epoch:03d}.pt")
         torch.save(state, self.ckpt_dir / "last.pt")
         if is_best:
             torch.save(state, self.ckpt_dir / "best.pt")

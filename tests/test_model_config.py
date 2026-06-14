@@ -43,3 +43,9 @@ def test_validate_rejects_bad_freeze(mini_repo):
     with pytest.raises(ValueError):
         TrainConfig.from_dict({"dataset_dir": str(out), "run_name": "r",
                                "resolution": 32, "epochs": 2, "freeze_epochs": 5})
+
+
+def test_validate_skips_resolution_when_dataset_absent(tmp_path):
+    cfg = TrainConfig.from_dict({"dataset_dir": str(tmp_path / "nope"),
+                                 "run_name": "r", "resolution": 99})
+    assert cfg.resolution == 99

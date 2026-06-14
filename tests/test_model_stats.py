@@ -41,3 +41,11 @@ def test_predictions_csv_content(tmp_path):
     assert rows[0]["pokemon_id"] == "5"
     assert rows[0]["y_true"] == "0.1"
     assert rows[0]["y_pred"] == "0.15"
+
+
+def test_save_checkpoint_can_skip_epoch_file(tmp_path):
+    rl = RunLogger(out_dir=tmp_path, run_name="s")
+    rl.save_checkpoint({"e": 1}, 1, is_best=True, save_epoch=False)
+    cd = tmp_path / "s" / "checkpoints"
+    assert not (cd / "epoch_001.pt").exists()
+    assert (cd / "last.pt").exists() and (cd / "best.pt").exists()
