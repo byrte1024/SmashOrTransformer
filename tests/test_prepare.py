@@ -1,4 +1,5 @@
 import json
+import pytest
 import numpy as np
 from data_prep.config import DataConfig
 from data_prep.prepare import prepare, load_sprite
@@ -38,3 +39,10 @@ def test_prepare_respects_category_filter(mini_repo):
     out = prepare(cfg, mini_repo["images"], mini_repo["labels"], mini_repo["root"] / "datasets")
     data = np.load(out / "data.npz", allow_pickle=True)
     assert set(np.unique(data["category"]).tolist()) == {"portrait"}
+
+
+def test_prepare_raises_on_empty_selection(mini_repo):
+    cfg = DataConfig.from_dict({"name": "empty", "resolution": 16, "minimages": 0,
+                                "selection": {"names": {"include": ["does-not-exist"]}}})
+    with pytest.raises(ValueError):
+        prepare(cfg, mini_repo["images"], mini_repo["labels"], mini_repo["root"] / "datasets")

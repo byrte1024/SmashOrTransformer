@@ -41,6 +41,12 @@ def prepare(cfg: DataConfig, images_dir, labels_csv, out_root) -> Path:
                                   "category": r.category, "gen": r.gen,
                                   "smash_pct": r.smash_pct, "total_votes": r.total_votes})
 
+    if not images:
+        raise ValueError(
+            f"No images selected for dataset {cfg.name!r}; "
+            "check selection filters and that images_dir/labels_csv are correct."
+        )
+
     pid_np = np.array(pid_arr, dtype=np.int64)
     images_obj = np.empty(len(images), dtype=object)
     for i, a in enumerate(images):
