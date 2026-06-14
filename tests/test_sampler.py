@@ -31,9 +31,10 @@ def test_sampler_determinism(mini_repo):
 
 def test_sampler_epoch_changes_augmentation(mini_repo):
     out = _build(mini_repo)
-    e0 = DataSampler(out, split="train", epoch=0)[0][0]
-    e1 = DataSampler(out, split="train", epoch=1)[0][0]
-    assert not np.array_equal(e0, e1)
+    a = DataSampler(out, split="train", epoch=0)
+    b = DataSampler(out, split="train", epoch=1)
+    assert a._plan != b._plan          # epoch changes the plan order/content
+    assert not np.array_equal(a[0][0], b[0][0])
 
 
 def test_sampler_split_isolation(mini_repo):

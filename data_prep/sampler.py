@@ -18,11 +18,13 @@ class DataSampler:
     def __init__(self, dataset_dir, split: str = "train", epoch: int = 0):
         self.dir = Path(dataset_dir)
         self.cfg = DataConfig.from_dict(json.loads((self.dir / "config.json").read_text()))
-        data = np.load(self.dir / "data.npz", allow_pickle=True)
-        self._images = data["images"]
-        self._row_pid = data["pokemon_id"]
-        self._smash = data["smash_pct"]
-        self._votes = data["total_votes"]
+        with np.load(self.dir / "data.npz", allow_pickle=True) as data:
+            self._images = data["images"]
+            self._row_pid = data["pokemon_id"]
+            self._smash = data["smash_pct"]
+            # total_votes is kept available for optional confidence-weighting by
+            # callers (e.g. weighting the loss by vote volume); not used internally.
+            self._votes = data["total_votes"]
 
         split_info = json.loads((self.dir / "split.json").read_text())
         self._rows = list(split_info[split])
