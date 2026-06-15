@@ -85,33 +85,37 @@ def build_poke_index(names) -> dict[str, str]:
     return idx
 
 
+def passes(post, poke_index, min_score=0) -> bool:
+    """A post is kept if it is safe-rated, has a file, clears the score floor,
+    has no human tag, and tags at most one Pokemon species."""
+    if (post.get("rating") or "safe") not in SAFE_RATINGS:
+        return False
+    if not post.get("file_url"):
+        return False
+    if int(post.get("score") or 0) < min_score:
+        return False
+    tags = set((post.get("tags") or "").split())
+    if tags & HUMAN_TAGS:
+        return False
+    species = {poke_index[t] for t in tags if t in poke_index}
+    return len(species) <= 1                       # >1 -> crossover / group
+
+
 def filter_posts(posts, poke_index, top, min_score=0) -> list[dict]:
-    """Keep the top `top` posts that are safe, human-free, and single-species.
-    `posts` must already be score-sorted (Safebooru sort:score)."""
+    """Keep the top `top` passing posts (posts must be score-sorted)."""
     kept = []
     for p in posts:
-        if (p.get("rating") or "safe") not in SAFE_RATINGS:
-            continue
-        if not p.get("file_url"):
-            continue
-        if int(p.get("score") or 0) < min_score:
-            continue
-        tags = set((p.get("tags") or "").split())
-        if tags & HUMAN_TAGS:
-            continue
-        species = {poke_index[t] for t in tags if t in poke_index}
-        if len(species) > 1:                      # crossover / group picture
-            continue
-        kept.append(p)
-        if len(kept) >= top:
-            break
+        if passes(p, poke_index, min_score):
+            kept.append(p)
+            if len(kept) >= top:
+                break
     return kept
 
 
 # --- network (monkeypatched in tests) ------------------------------------- #
-def search(session, tag, buffer) -> list[dict]:
+def search(session, tag, limit, pid=0) -> list[dict]:
     params = {"page": "dapi", "s": "post", "q": "index", "json": "1",
-              "limit": buffer, "tags": f"{tag} sort:score"}
+              "limit": limit, "pid": pid, "tags": f"{tag} sort:score"}
     r = session.get(API, params=params, headers=UA, timeout=30)
     r.raise_for_status()
     if not r.text.strip():
@@ -126,20 +130,49 @@ def download(session, url, dest) -> None:
     Path(dest).write_bytes(r.content)
 
 
-def process_pokemon(session, pid, name, images_dir, poke_index, top, buffer,
-                    min_score, sleep_dl, force) -> int:
+def collect_clean(session, candidates, poke_index, top, page_size, max_pages,
+                  min_score=0, sleep_page=0.0) -> list[dict]:
+    """Paginate score-sorted results for the first candidate tag that returns
+    anything, accumulating clean posts until `top` are found, a page comes back
+    empty, or `max_pages` is reached. Auto-grows: stops as soon as `top` is met."""
+    kept, seen = [], set()
+    for tag in candidates:
+        posts = search(session, tag, page_size, 0)
+        if not posts:
+            continue
+        page = 0
+        while True:
+            for p in posts:
+                pid = p.get("id")
+                if pid in seen:
+                    continue
+                seen.add(pid)
+                if passes(p, poke_index, min_score):
+                    kept.append(p)
+                    if len(kept) >= top:
+                        return kept
+            page += 1
+            if page >= max_pages:
+                break
+            if sleep_page:
+                time.sleep(sleep_page)
+            posts = search(session, tag, page_size, page)
+            if not posts:
+                break
+        break                       # first candidate with results wins
+    return kept
+
+
+def process_pokemon(session, pid, name, images_dir, poke_index, top, page_size,
+                    max_pages, min_score, sleep_dl, sleep_page, force) -> int:
     folder = Path(images_dir) / str(pid) / "booru"
     existing = list(folder.glob("[0-9]*.*")) if folder.exists() else []
     if existing and len(existing) >= top and not force:
         return -1                                  # already done -> resume skip
     folder.mkdir(parents=True, exist_ok=True)
 
-    posts = []
-    for tag in search_candidates(name):
-        posts = search(session, tag, buffer)
-        if posts:
-            break
-    kept = filter_posts(posts, poke_index, top, min_score)
+    kept = collect_clean(session, search_candidates(name), poke_index, top,
+                         page_size, max_pages, min_score, sleep_page)
 
     rows = []
     for rank, p in enumerate(kept):
@@ -161,8 +194,9 @@ def process_pokemon(session, pid, name, images_dir, poke_index, top, buffer,
     return len(rows)
 
 
-def run(names_csv="pokemon_names.csv", images_dir="images", top=10, buffer=100,
-        min_score=0, ids=None, limit=None, sleep=1.0, sleep_dl=0.25, force=False):
+def run(names_csv="pokemon_names.csv", images_dir="images", top=10, page_size=100,
+        max_pages=10, min_score=0, ids=None, limit=None, sleep=1.0, sleep_dl=0.25,
+        sleep_page=0.5, force=False):
     names = load_names(names_csv)
     poke_index = build_poke_index(names)
     if ids:
@@ -175,7 +209,7 @@ def run(names_csv="pokemon_names.csv", images_dir="images", top=10, buffer=100,
     got, skipped, empty = 0, 0, 0
     for pid, name in tqdm(names, desc="booru", unit="pkmn"):
         n = process_pokemon(session, pid, name, images_dir, poke_index, top,
-                            buffer, min_score, sleep_dl, force)
+                            page_size, max_pages, min_score, sleep_dl, sleep_page, force)
         if n == -1:
             skipped += 1
             continue
@@ -194,18 +228,22 @@ def main(argv=None):
     p.add_argument("--names", default="pokemon_names.csv")
     p.add_argument("--images", default="images")
     p.add_argument("--top", type=int, default=10)
-    p.add_argument("--buffer", type=int, default=100)
+    p.add_argument("--page-size", type=int, default=100, help="posts fetched per page")
+    p.add_argument("--max-pages", type=int, default=10,
+                   help="stop after this many pages even if <top clean found")
     p.add_argument("--min-score", type=int, default=0)
     p.add_argument("--ids", default=None, help="comma-separated dex ids (e.g. 6,282)")
     p.add_argument("--limit", type=int, default=None, help="only the first N pokemon")
-    p.add_argument("--sleep", type=float, default=1.0, help="seconds between queries")
+    p.add_argument("--sleep", type=float, default=1.0, help="seconds between pokemon")
     p.add_argument("--sleep-dl", type=float, default=0.25, help="seconds between downloads")
+    p.add_argument("--sleep-page", type=float, default=0.5, help="seconds between pages")
     p.add_argument("--force", action="store_true", help="re-download even if present")
     args = p.parse_args(argv)
     ids = [int(x) for x in args.ids.split(",")] if args.ids else None
-    run(names_csv=args.names, images_dir=args.images, top=args.top, buffer=args.buffer,
-        min_score=args.min_score, ids=ids, limit=args.limit, sleep=args.sleep,
-        sleep_dl=args.sleep_dl, force=args.force)
+    run(names_csv=args.names, images_dir=args.images, top=args.top,
+        page_size=args.page_size, max_pages=args.max_pages, min_score=args.min_score,
+        ids=ids, limit=args.limit, sleep=args.sleep, sleep_dl=args.sleep_dl,
+        sleep_page=args.sleep_page, force=args.force)
 
 
 if __name__ == "__main__":
