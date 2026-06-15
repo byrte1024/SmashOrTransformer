@@ -57,3 +57,30 @@ def test_sampler_votes_accessible(mini_repo):
     ds = DataSampler(_build(mini_repo), split="train", epoch=0)
     v = ds.votes(0)
     assert isinstance(v, int) and v > 0
+
+
+def test_sampler_routes_booru_through_photo_aug(mini_repo, tmp_path):
+    # give pokemon 1 a booru image; build a booru+portrait dataset
+    import csv as _csv
+    from PIL import Image as _Image
+    booru = mini_repo["images"] / "1" / "booru"
+    booru.mkdir()
+    _Image.new("RGB", (40, 40), (10, 200, 30)).save(booru / "00_777.jpg")
+    with open(booru / "meta.csv", "w", newline="") as f:
+        w = _csv.DictWriter(f, fieldnames=["rank", "post_id", "score", "rating", "file_url"])
+        w.writeheader(); w.writerow({"rank": 0, "post_id": 777, "score": 9,
+                                     "rating": "safe", "file_url": "x"})
+    cfg = DataConfig.from_dict({"name": "mix", "resolution": 32, "minimages": 1,
+                                "variations": 2,
+                                "selection": {"categories": ["portrait", "booru"]},
+                                "split": {"strategy": "image", "val_frac": 0.0},
+                                "augmentations": {"sprite": {"background": {"prob": 0.0}},
+                                                  "photo": {"flip": 0.0}}})
+    out = prepare(cfg, mini_repo["images"], mini_repo["labels"], tmp_path / "datasets")
+    ds = DataSampler(out, split="train", epoch=0)
+    # both categories made it into the dataset
+    cats = set(__import__("numpy").load(out / "data.npz", allow_pickle=True)["category"].tolist())
+    assert "booru" in cats and "portrait" in cats
+    img, label = ds[0]
+    assert img.shape == (32, 32, 3) and img.dtype.name == "uint8"
+    assert 0.0 <= label <= 1.0

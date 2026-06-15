@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 from .config import DataConfig
-from .augmentations import build_augmentations
+from .augmentations import build_sprite_aug, build_photo_aug
 from .sampling import build_sampling
 
 
@@ -25,13 +25,15 @@ class DataSampler:
             # total_votes is kept available for optional confidence-weighting by
             # callers (e.g. weighting the loss by vote volume); not used internally.
             self._votes = data["total_votes"]
+            self._cat = data["category"]
 
         split_info = json.loads((self.dir / "split.json").read_text())
         self._rows = list(split_info[split])
         self.split = split
         self.epoch = epoch
 
-        self._compose = build_augmentations(self.cfg)
+        self._sprite_aug = build_sprite_aug(self.cfg)
+        self._photo_aug = build_photo_aug(self.cfg)
         self._sampling = build_sampling(self.cfg)
         self._plan = self._build_plan(epoch)
 
@@ -60,5 +62,6 @@ class DataSampler:
         row = self._plan[i]
         rng = np.random.default_rng([self.cfg.seed, self.epoch, i])
         sprite = Image.fromarray(self._images[row], "RGBA")
-        img = self._compose.apply(sprite, rng, self.cfg.resolution)
+        aug = self._photo_aug if str(self._cat[row]) == "booru" else self._sprite_aug
+        img = aug.apply(sprite, rng, self.cfg.resolution)
         return np.asarray(img, dtype=np.uint8), float(self._smash[row])
