@@ -1,15 +1,15 @@
-"""Tkinter GUI to score images for smash/pass.
+"""Pygame GUI to score images for smash/pass.
 
 Features:
-  - pick a model (a run under runs/) and a specific checkpoint from dropdowns
-    (auto-discovered), or browse to any .pt
-  - open a single image, or a whole folder and step through it with Prev/Next
-    (or the Left/Right arrow keys)
-  - drag-and-drop image files onto the window (if tkinterdnd2 is available)
-  - Share: save the generated labeled (banner) image to disk
+  - pick a model (a run under runs/) and a specific checkpoint from the sidebar
+    (auto-discovered); drop a .pt to load one from anywhere
+  - drag-and-drop image file(s) or a whole folder; step with Prev/Next or the
+    Left/Right arrow keys
+  - Share (button or 's'): save the generated labeled (banner) image to
+    results/shared/
 
 All non-GUI logic lives in pure helpers (find_models / find_checkpoints /
-list_images / build_result_image / _parse_drop) that are unit-tested; tkinter is
+list_images / build_result_image / _parse_drop) that are unit-tested; pygame is
 imported lazily inside the GUI builder so this module imports headlessly.
 
     uv run python -m model.score_image_app            # auto-discovers runs/
@@ -95,75 +95,66 @@ def build_result_image(model, cfg, calib, path, device="cuda", threshold=0.5,
 # GUI
 # --------------------------------------------------------------------------- #
 def _run_gui(runs_dir, device, threshold, initial_checkpoint=None, display_res=384):
-    import tkinter as tk
-    from tkinter import filedialog, ttk
-    from PIL import ImageTk
-    try:
-        from tkinterdnd2 import TkinterDnD, DND_FILES
-        root = TkinterDnD.Tk()
-        has_dnd = True
-    except Exception:
-        root = tk.Tk()
-        has_dnd = False
+    import pygame
+    pygame.init()
+    SW = display_res + 250
+    SH = display_res + 240
+    screen = pygame.display.set_mode((SW, SH), pygame.RESIZABLE)
+    pygame.display.set_caption("Smash or Pass - Pokemon scorer")
+    clock = pygame.time.Clock()
+    F = lambda s, b=False: pygame.font.SysFont("Arial", s, bold=b)
+    font, big, small, hdr = F(17), F(26, True), F(13), F(14, True)
+    BG, PANEL, SELc = (28, 28, 30), (44, 44, 48), (58, 88, 140)
+    TXT, MUT = (222, 222, 222), (140, 140, 142)
+    GREEN, RED, BTN, BTNH = (52, 199, 89), (255, 59, 48), (66, 66, 72), (96, 96, 104)
+    SIDEBAR = 230
 
-    root.title("Smash or Pass - Pokemon scorer")
-    root.configure(bg="#1e1e1e")
     st = {"model": None, "cfg": None, "calib": None, "images": [], "idx": -1,
-          "result": None, "imgref": None, "cks": []}
-    models = find_models(runs_dir)
+          "result": None, "surf": None, "status": "select a model (sidebar) "
+          "and drop an image", "models": find_models(runs_dir),
+          "cks": [], "sel_model": -1, "sel_ck": -1}
 
-    def status(msg):
-        detail.config(text=msg)
+    def to_surface(pil):
+        return pygame.image.fromstring(pil.tobytes(), pil.size, pil.mode)
+
+    def render_loading(msg):
+        screen.fill(BG)
+        screen.blit(big.render(msg, True, TXT), (SIDEBAR + 24, screen.get_height() // 2))
+        pygame.display.flip()
 
     def do_load(ckpt_path):
-        status(f"loading {Path(ckpt_path).parent.parent.name}/{Path(ckpt_path).name} ...")
-        root.update_idletasks()
+        render_loading("loading model...")
         st["model"], st["cfg"] = load_model(ckpt_path, device=device, pretrained=False)
         st["calib"] = load_calibration(ckpt_path, fit="auto")
-        status(f"loaded {Path(ckpt_path).parent.parent.name}/{Path(ckpt_path).name}")
+        st["status"] = f"loaded {Path(ckpt_path).parent.parent.name}/{Path(ckpt_path).name}"
         if st["images"]:
             show_current()
 
-    def on_model_change(*_):
-        md = dict(models).get(model_var.get())
-        st["cks"] = find_checkpoints(md) if md else []
-        ckpt_menu["values"] = [c[0] for c in st["cks"]]
+    def select_model(i):
+        st["sel_model"] = i
+        st["cks"] = find_checkpoints(st["models"][i][1])
+        st["sel_ck"] = 0 if st["cks"] else -1
         if st["cks"]:
-            ckpt_var.set(st["cks"][0][0])
             do_load(st["cks"][0][1])
 
-    def on_ckpt_change(*_):
-        ck = dict(st["cks"]).get(ckpt_var.get())
-        if ck:
-            do_load(ck)
-
-    def browse_checkpoint():
-        p = filedialog.askopenfilename(title="Pick a checkpoint",
-                                       filetypes=[("Checkpoints", "*.pt"), ("All", "*.*")])
-        if p:
-            do_load(p)
+    def select_ck(j):
+        st["sel_ck"] = j
+        do_load(st["cks"][j][1])
 
     def set_images(paths):
         paths = [Path(p) for p in paths if Path(p).suffix.lower() in _IMG_EXTS]
-        if not paths:
-            return
-        st["images"], st["idx"] = paths, 0
-        show_current()
+        if paths:
+            st["images"], st["idx"] = paths, 0
+            show_current()
 
-    def open_image():
-        p = filedialog.askopenfilename(filetypes=[
-            ("Images", "*.png *.jpg *.jpeg *.webp *.bmp *.gif"), ("All", "*.*")])
-        if p:
-            set_images([p])
-
-    def open_folder():
-        d = filedialog.askdirectory()
-        if d:
-            imgs = list_images(d)
-            if imgs:
-                set_images(imgs)
-            else:
-                status("no images in that folder")
+    def handle_drop(paths):
+        if len(paths) == 1 and Path(paths[0]).is_dir():
+            imgs = list_images(paths[0])
+            set_images(imgs) if imgs else st.update(status="no images in that folder")
+        elif len(paths) == 1 and Path(paths[0]).suffix.lower() == ".pt":
+            do_load(paths[0])
+        else:
+            set_images(paths)
 
     def step(delta):
         if st["images"]:
@@ -172,75 +163,121 @@ def _run_gui(runs_dir, device, threshold, initial_checkpoint=None, display_res=3
 
     def show_current():
         if st["model"] is None:
-            status("select a model first")
+            st["status"] = "select a model first"
             return
         path = st["images"][st["idx"]]
         img, raw, cal, smash = build_result_image(st["model"], st["cfg"], st["calib"],
                                                   path, device, threshold, display_res)
         st["result"] = img
-        st["imgref"] = ImageTk.PhotoImage(img)
-        preview.config(image=st["imgref"])
-        n = len(st["images"])
-        status(f"raw {raw:.1f}%   calibrated {cal:.1f}%   "
-               f"[{st['idx'] + 1}/{n}]   {path.name}")
+        st["surf"] = to_surface(img)
+        st["status"] = (f"raw {raw:.1f}%   calibrated {cal:.1f}%   "
+                        f"[{st['idx'] + 1}/{len(st['images'])}]   {path.name}")
 
     def share():
         if st["result"] is None:
             return
+        out = Path("results/shared")
+        out.mkdir(parents=True, exist_ok=True)
         name = st["images"][st["idx"]].stem if st["images"] else "result"
-        f = filedialog.asksaveasfilename(defaultextension=".png", initialfile=f"{name}_scored.png",
-                                         filetypes=[("PNG", "*.png")])
-        if f:
-            st["result"].save(f)
-            status(f"saved {f}")
+        dest = out / f"{name}_scored.png"
+        st["result"].save(dest)
+        st["status"] = f"saved {dest}"
 
-    def on_drop(event):
-        set_images(_parse_drop(event.data))
+    def button(rect, label, clicks, mouse):
+        hover = rect.collidepoint(mouse)
+        pygame.draw.rect(screen, BTNH if hover else BTN, rect, border_radius=6)
+        t = font.render(label, True, TXT)
+        screen.blit(t, (rect.centerx - t.get_width() // 2, rect.centery - t.get_height() // 2))
+        clicks.append((rect, label))
 
-    # --- layout ---
-    top = tk.Frame(root, bg="#1e1e1e"); top.pack(pady=8, padx=8, fill="x")
-    tk.Label(top, text="Model", bg="#1e1e1e", fg="#ccc").pack(side="left")
-    model_var = tk.StringVar()
-    model_menu = ttk.Combobox(top, textvariable=model_var, state="readonly", width=24,
-                              values=[m[0] for m in models])
-    model_menu.pack(side="left", padx=4)
-    model_menu.bind("<<ComboboxSelected>>", on_model_change)
-    tk.Label(top, text="Checkpoint", bg="#1e1e1e", fg="#ccc").pack(side="left")
-    ckpt_var = tk.StringVar()
-    ckpt_menu = ttk.Combobox(top, textvariable=ckpt_var, state="readonly", width=22)
-    ckpt_menu.pack(side="left", padx=4)
-    ckpt_menu.bind("<<ComboboxSelected>>", on_ckpt_change)
-    tk.Button(top, text="Browse...", command=browse_checkpoint).pack(side="left", padx=4)
-
-    btns = tk.Frame(root, bg="#1e1e1e"); btns.pack(pady=4)
-    for text, cmd in [("Open image", open_image), ("Open folder", open_folder),
-                      ("< Prev", lambda: step(-1)), ("Next >", lambda: step(1)),
-                      ("Share", share)]:
-        tk.Button(btns, text=text, command=cmd, font=("Helvetica", 12)).pack(side="left", padx=4)
-
-    preview = tk.Label(root, bg="#1e1e1e"); preview.pack(pady=8)
-    detail = tk.Label(root, text="select a model and open an image", bg="#1e1e1e",
-                      fg="#999", font=("Helvetica", 12))
-    detail.pack(pady=4)
-    hint = ("drag & drop images here  |  arrow keys to navigate" if has_dnd
-            else "arrow keys to navigate  (install tkinterdnd2 for drag & drop)")
-    tk.Label(root, text=hint, bg="#1e1e1e", fg="#666", font=("Helvetica", 10)).pack(pady=2)
-
-    root.bind("<Left>", lambda e: step(-1))
-    root.bind("<Right>", lambda e: step(1))
-    if has_dnd:
-        root.drop_target_register(DND_FILES)
-        root.dnd_bind("<<Drop>>", on_drop)
-
-    # initial model selection
     if initial_checkpoint:
         do_load(initial_checkpoint)
-    elif models:
-        model_var.set(models[0][0])
-        on_model_change()
+    elif st["models"]:
+        select_model(0)
 
-    root.geometry(f"{display_res + 160}x{display_res + 260}")
-    root.mainloop()
+    drop_buf = []
+    running = True
+    while running:
+        W, H = screen.get_size()
+        mouse = pygame.mouse.get_pos()
+        clicks = []          # (rect, action_key) registered this frame
+        row_actions = []     # (rect, callable)
+
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                running = False
+            elif e.type == pygame.VIDEORESIZE:
+                screen = pygame.display.set_mode((e.w, e.h), pygame.RESIZABLE)
+            elif e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_LEFT:
+                    step(-1)
+                elif e.key == pygame.K_RIGHT:
+                    step(1)
+                elif e.key == pygame.K_s:
+                    share()
+                elif e.key == pygame.K_ESCAPE:
+                    running = False
+            elif e.type == pygame.DROPFILE:
+                drop_buf.append(e.file)
+            elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+                for rect, fn in st.get("_rows", []):
+                    if rect.collidepoint(e.pos):
+                        fn(); break
+                else:
+                    for rect, key in st.get("_btns", []):
+                        if rect.collidepoint(e.pos):
+                            {"prev": lambda: step(-1), "next": lambda: step(1),
+                             "share": share}[key](); break
+        if drop_buf:
+            handle_drop(drop_buf); drop_buf = []
+
+        # --- render ---
+        screen.fill(BG)
+        pygame.draw.rect(screen, PANEL, (0, 0, SIDEBAR, H))
+        y = 12
+        screen.blit(hdr.render("MODELS", True, MUT), (12, y)); y += 22
+        for i, (name, _) in enumerate(st["models"]):
+            r = pygame.Rect(8, y, SIDEBAR - 16, 24)
+            if i == st["sel_model"]:
+                pygame.draw.rect(screen, SELc, r, border_radius=4)
+            screen.blit(font.render(name[:26], True, TXT), (14, y + 3))
+            row_actions.append((r, (lambda k: (lambda: select_model(k)))(i)))
+            y += 26
+        y += 10
+        screen.blit(hdr.render("CHECKPOINTS", True, MUT), (12, y)); y += 22
+        for j, (label, _) in enumerate(st["cks"]):
+            r = pygame.Rect(8, y, SIDEBAR - 16, 22)
+            if j == st["sel_ck"]:
+                pygame.draw.rect(screen, SELc, r, border_radius=4)
+            screen.blit(small.render(label, True, TXT), (14, y + 3))
+            row_actions.append((r, (lambda k: (lambda: select_ck(k)))(j)))
+            y += 24
+        st["_rows"] = row_actions
+
+        # main area: image
+        if st["surf"] is not None:
+            iw, ih = st["surf"].get_size()
+            avail_w, avail_h = W - SIDEBAR - 40, H - 110
+            scale = min(avail_w / iw, avail_h / ih, 1.0)
+            surf = pygame.transform.smoothscale(st["surf"], (int(iw * scale), int(ih * scale)))
+            screen.blit(surf, (SIDEBAR + (W - SIDEBAR - surf.get_width()) // 2, 20))
+
+        # buttons row + status
+        st["_btns"] = []
+        bw, bh, by = 110, 36, H - 78
+        bx = SIDEBAR + 24
+        for key, label in [("prev", "< Prev"), ("next", "Next >"), ("share", "Share (s)")]:
+            r = pygame.Rect(bx, by, bw, bh)
+            button(r, label, st["_btns"], mouse)
+            st["_btns"][-1] = (r, key)
+            bx += bw + 12
+        screen.blit(font.render(st["status"], True, TXT), (SIDEBAR + 24, H - 34))
+        screen.blit(small.render("drop image(s)/folder/.pt here  |  arrows navigate",
+                                 True, MUT), (SIDEBAR + 24, H - 14))
+
+        pygame.display.flip()
+        clock.tick(30)
+    pygame.quit()
 
 
 def main(argv=None):
