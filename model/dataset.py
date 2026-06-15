@@ -81,6 +81,6 @@ class EvalDataset(Dataset):
 
     def __getitem__(self, i: int):
         r = self._rows[i]
-        img = canonical_render(self._images[r], self.resolution)
+        img = render_input(self._images[r], self.resolution, stretch=True)
         t = to_tensor(img, self.mean, self.std)
         return t, torch.tensor(float(self._smash[r]), dtype=torch.float32), int(self._pid[r])

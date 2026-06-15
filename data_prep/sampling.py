@@ -42,8 +42,15 @@ class FillSo(SamplingStrategy):
         for rows in rows_by_pokemon.values():
             if not rows:
                 continue
-            for i in range(target):
-                plan.append(rows[i % len(rows)])
+            k = len(rows)
+            # Every image used equally `target // k` times; the leftover
+            # `target % k` slots go to a random subset (re-rolled each epoch)
+            # so no image is systematically favored.
+            base, rem = divmod(target, k)
+            plan.extend(rows * base)
+            if rem:
+                extra = rng.choice(k, size=rem, replace=False)
+                plan.extend(rows[j] for j in extra)
         return _shuffled(plan, rng)
 
 

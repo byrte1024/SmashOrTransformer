@@ -1,0 +1,26 @@
+{
+  "name": "mixed_v2",
+  "resolution": 224,
+  "seed": 0,
+  "minimages": 3,
+  "selection": {"categories": ["portrait", "in-game", "booru"]},
+  "variations": {"fill_so": 250},
+  "split": {"strategy": "pokemon", "val_frac": 0.1},
+  "augmentations": {
+    "sprite": {
+      "scale": {"w": [0.65, 1.10], "h": [0.65, 1.10]},
+      "scale_method": "bilinear",
+      "position": {"x": [0.10, 0.90], "y": [0.10, 0.90]},
+      "rotation": [-10, 10],
+      "flip": 0.5,
+      "background": {"prob": 0.8, "dirs": ["backgrounds/real", "backgrounds/pokemon_battle"]}
+    },
+    "photo": {
+      "scale": [0.9, 1.2],
+      "position": {"x": [0.4, 0.6], "y": [0.4, 0.6]},
+      "color": {"brightness": 0.2, "contrast": 0.3, "saturation": 0.2, "hue": 0.1},
+      "flip": 0.5,
+      "background": {"white": true, "black": true, "dirs": ["backgrounds/real", "backgrounds/pokemon_battle"]}
+    }
+  }
+}
