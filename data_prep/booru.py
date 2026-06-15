@@ -12,6 +12,7 @@ between requests and resumes (skips Pokemon already populated).
 from __future__ import annotations
 import argparse
 import csv
+import re
 import time
 from pathlib import Path
 import requests
@@ -20,13 +21,26 @@ from tqdm import tqdm
 API = "https://safebooru.org/index.php"
 UA = {"User-Agent": "Mozilla/5.0 (SmashOrTransformer dataset builder)"}
 
-# tags that imply a human/humanized subject in the picture
+# Any tag implying a human / humanoid figure in the picture. People-count tags
+# (1girl, 2boys, 6+girls, 1other, 10+boys, ...) are matched by pattern so no
+# variant is missed; the keyword set covers humanized/anthropomorphized art.
+# This rejects HUMANS, not humanoid Pokemon: a pic tagged "gardevoir" is kept,
+# but "gardevoir gijinka/humanization" (drawn as a person) is rejected.
+_HUMAN_COUNT_RE = re.compile(r"^\d+\+?(girl|boy|other)s?$")
 HUMAN_TAGS = {
-    "1girl", "1boy", "2girls", "2boys", "3girls", "3boys", "4girls", "4boys",
-    "5girls", "5boys", "6+girls", "6+boys", "multiple_girls", "multiple_boys",
-    "human", "humanization", "personification", "gijinka", "cosplay", "1other",
+    "multiple_girls", "multiple_boys", "multiple_others", "human", "humans",
+    "humanization", "humanized", "personification", "gijinka", "cosplay",
+    "humanoid", "human_focus", "furry", "anthro",
 }
 SAFE_RATINGS = {"safe", "general"}
+
+
+def is_human(tags) -> bool:
+    """True if any tag implies a human/humanoid/anthropomorphized figure."""
+    tags = set(tags)
+    if tags & HUMAN_TAGS:
+        return True
+    return any(_HUMAN_COUNT_RE.match(t) for t in tags)
 
 # PokeAPI default-form suffixes -> stripped to the base species for the booru tag
 _FORM_SUFFIXES = {
@@ -95,7 +109,7 @@ def passes(post, poke_index, min_score=0) -> bool:
     if int(post.get("score") or 0) < min_score:
         return False
     tags = set((post.get("tags") or "").split())
-    if tags & HUMAN_TAGS:
+    if is_human(tags):
         return False
     species = {poke_index[t] for t in tags if t in poke_index}
     return len(species) <= 1                       # >1 -> crossover / group
