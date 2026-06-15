@@ -31,11 +31,16 @@ DEFAULT_MODEL_ID = "sd-legacy/stable-diffusion-v1-5"
 
 
 def _score_tensor(smash_model, img01, mean, std, resolution):
-    """Differentiable smash score in [0,1] for a [B,3,H,W] image in [0,1]."""
+    """Differentiable smash score in [0,1] for a [B,3,H,W] image in [0,1].
+
+    The SD pipe runs in fp16 while the smash model is fp32, so cast the
+    (interpolated, normalized) input to the smash model's dtype -- the cast is
+    differentiable, so guidance gradients still flow back to the latents."""
+    mdtype = next(smash_model.parameters()).dtype
     x = F.interpolate(img01, size=resolution, mode="bilinear", align_corners=False)
-    m = torch.tensor(mean, device=img01.device, dtype=img01.dtype).view(1, 3, 1, 1)
-    s = torch.tensor(std, device=img01.device, dtype=img01.dtype).view(1, 3, 1, 1)
-    return torch.sigmoid(smash_model((x - m) / s).reshape(-1))
+    m = torch.tensor(mean, device=img01.device, dtype=x.dtype).view(1, 3, 1, 1)
+    s = torch.tensor(std, device=img01.device, dtype=x.dtype).view(1, 3, 1, 1)
+    return torch.sigmoid(smash_model(((x - m) / s).to(mdtype)).reshape(-1))
 
 
 def smash_loss(smash_model, img01, target, mean, std, resolution):
