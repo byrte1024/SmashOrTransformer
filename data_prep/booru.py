@@ -30,7 +30,7 @@ _HUMAN_COUNT_RE = re.compile(r"^\d+\+?(girl|boy|other)s?$")
 HUMAN_TAGS = {
     "multiple_girls", "multiple_boys", "multiple_others", "human", "humans",
     "humanization", "humanized", "personification", "gijinka", "cosplay",
-    "humanoid", "human_focus", "furry", "anthro",
+    "humanoid", "human_focus",
 }
 SAFE_RATINGS = {"safe", "general"}
 

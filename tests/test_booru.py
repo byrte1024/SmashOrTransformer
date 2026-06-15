@@ -119,7 +119,8 @@ def test_is_human_covers_count_and_humanoid_variants():
     for t in ["1girl", "1boy", "2girls", "3boys", "6+girls", "10+boys", "1other", "6+others"]:
         assert is_human({"charizard", t}), t            # all people-count variants
     for t in ["humanization", "humanized", "gijinka", "personification", "cosplay",
-              "humanoid", "human", "multiple_girls", "furry", "anthro"]:
-        assert is_human({"charizard", t}), t            # humanoid/anthro keywords
+              "humanoid", "human", "multiple_girls"]:
+        assert is_human({"charizard", t}), t            # humanoid keywords
     assert not is_human({"charizard", "fire", "flying", "solo"})   # solo pokemon kept
     assert not is_human({"gardevoir", "green_hair", "red_eyes"})   # humanoid POKEMON kept
+    assert not is_human({"charizard", "furry", "anthro"})          # anthro art kept now
