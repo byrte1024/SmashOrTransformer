@@ -65,7 +65,7 @@ def _blur(img01, sigma):
     return F.conv2d(F.pad(img01, [pad] * 4, mode="reflect"), k, groups=3)
 
 
-def _random_affine(x, gen, max_rot=12.0, max_scale=0.12, max_jitter=0.08):
+def _random_affine(x, gen, max_rot=20.0, max_scale=0.30, max_jitter=0.12):
     """Robustness transform: random rotate/scale/translate via grid_sample."""
     n, _, h, w = x.shape
     ang = (torch.rand(1, generator=gen, device=x.device) * 2 - 1) * math.radians(max_rot)
@@ -80,19 +80,44 @@ def _random_affine(x, gen, max_rot=12.0, max_scale=0.12, max_jitter=0.08):
     return F.grid_sample(x, grid, padding_mode="reflection", align_corners=False)
 
 
+def _augment_batch(x, gen, k, enable):
+    """Ensemble of k independently-transformed copies (the key to legible,
+    feature-rich activation maximization rather than adversarial static)."""
+    if not enable:
+        return x
+    return torch.cat([_random_affine(x, gen) for _ in range(k)], dim=0)
+
+
 # --------------------------------------------------------------------------- #
 # image parameterizations (each is an nn.Module; .image() -> [1,3,H,W] in [0,1])
 # --------------------------------------------------------------------------- #
 class PixelParam(torch.nn.Module):
-    def __init__(self, res, gen, device, init01=None):
+    """Direct pixel canvas (optionally coarser than the model res, then upsampled
+    -> biases toward larger, coherent features instead of fine static). Direct
+    clamp (not sigmoid-logit) so a real-image init isn't gradient-frozen."""
+    def __init__(self, res, gen, device, init01=None, canvas_frac=1.0):
         super().__init__()
+        self.res = res
+        c = max(8, int(round(res * canvas_frac)))
         if init01 is None:
-            init01 = 0.5 + 0.01 * torch.randn(1, 3, res, res, generator=gen, device=device)
-        logit = torch.logit(init01.clamp(1e-3, 1 - 1e-3))
-        self.p = torch.nn.Parameter(logit)
+            base = 0.5 + 0.01 * torch.randn(1, 3, c, c, generator=gen, device=device)
+        else:
+            base = F.interpolate(init01, size=c, mode="bilinear", align_corners=False)
+        self.p = torch.nn.Parameter(base.clamp(0, 1))
 
     def image(self):
-        return torch.sigmoid(self.p)
+        img = F.interpolate(self.p, size=self.res, mode="bilinear", align_corners=False)
+        return img.clamp(0, 1)
+
+    @torch.no_grad()
+    def clamp_(self):
+        self.p.clamp_(0, 1)
+
+    @torch.no_grad()
+    def set_image(self, img01_res):
+        c = self.p.shape[-1]
+        self.p.copy_(F.interpolate(img01_res, size=c, mode="bilinear",
+                                   align_corners=False).clamp(0, 1))
 
 
 class FourierParam(torch.nn.Module):
@@ -134,13 +159,16 @@ class MacoParam(torch.nn.Module):
         return torch.sigmoid(img)
 
 
+# transform=True everywhere: the augmentation ensemble is what yields legible,
+# feature-rich images instead of adversarial static. canvas<1 (pixel) makes
+# features larger. grad_norm stabilizes pixel optimization (classic DeepDream).
 _CONFIG = {
-    "pixel_tv":  dict(param="pixel",   transform=False, blur=False, tv=0.10, l2=1e-3),
-    "robust":    dict(param="pixel",   transform=True,  blur=False, tv=0.05, l2=0.0),
-    "blur":      dict(param="pixel",   transform=False, blur=True,  tv=0.02, l2=0.0),
-    "fourier":   dict(param="fourier", transform=True,  blur=False, tv=0.0,  l2=0.0),
-    "maco":      dict(param="maco",    transform=True,  blur=False, tv=0.0,  l2=0.0),
-    "deepdream": dict(param="pixel",   transform=True,  blur=False, tv=0.05, l2=0.0),
+    "pixel_tv":  dict(param="pixel",   blur=False, tv=0.15, l2=1e-3, canvas=0.5, aug=12, grad_norm=True),
+    "robust":    dict(param="pixel",   blur=False, tv=0.05, l2=0.0,  canvas=0.5, aug=16, grad_norm=True),
+    "blur":      dict(param="pixel",   blur=True,  tv=0.02, l2=0.0,  canvas=0.5, aug=12, grad_norm=True),
+    "fourier":   dict(param="fourier", blur=False, tv=0.0,  l2=0.0,  canvas=1.0, aug=16, grad_norm=False),
+    "maco":      dict(param="maco",    blur=False, tv=0.0,  l2=0.0,  canvas=1.0, aug=16, grad_norm=False),
+    "deepdream": dict(param="pixel",   blur=False, tv=0.05, l2=0.0,  canvas=1.0, aug=8,  grad_norm=True),
 }
 
 
@@ -151,7 +179,7 @@ def maximize(model, mean, std, target, technique, seed, device, res,
     cfg = _CONFIG[technique]
     gen = torch.Generator(device=device).manual_seed(seed)
     if cfg["param"] == "pixel":
-        param = PixelParam(res, gen, device, init01=seed_img01)
+        param = PixelParam(res, gen, device, init01=seed_img01, canvas_frac=cfg["canvas"])
     elif cfg["param"] == "fourier":
         param = FourierParam(res, gen, device)
     else:
@@ -162,24 +190,28 @@ def maximize(model, mean, std, target, technique, seed, device, res,
 
     for step in range(steps):
         img01 = param.image()
-        x = _normalize(img01, mean, std)
-        if cfg["transform"]:
-            x = _random_affine(x, gen)
-        score = torch.sigmoid(model(x).squeeze())
-        loss = (score - t) ** 2
+        xb = _augment_batch(_normalize(img01, mean, std), gen, cfg["aug"], enable=True)
+        scores = torch.sigmoid(model(xb).reshape(-1))   # one per augmented view
+        loss = ((scores - t) ** 2).mean()
         if cfg["tv"]:
             loss = loss + cfg["tv"] * _tv(img01)
         if cfg["l2"]:
             loss = loss + cfg["l2"] * ((img01 - 0.5) ** 2).mean()
-        opt.zero_grad(); loss.backward(); opt.step()
+        opt.zero_grad(); loss.backward()
+        if cfg["grad_norm"]:
+            for p in param.parameters():
+                if p.grad is not None:
+                    p.grad.div_(p.grad.std() + 1e-8)
+        opt.step()
+        if hasattr(param, "clamp_"):
+            param.clamp_()
         if cfg["blur"] and step % 16 == 0 and step > 0:
             with torch.no_grad():
-                blurred = _blur(param.image(), sigma=1.0)
-                param.p.copy_(torch.logit(blurred.clamp(1e-3, 1 - 1e-3)))
+                param.set_image(_blur(param.image(), sigma=1.0))
 
     with torch.no_grad():
         img01 = param.image()
-        achieved = float(torch.sigmoid(model(_normalize(img01, mean, std)).squeeze()))
+        achieved = float(torch.sigmoid(model(_normalize(img01, mean, std)).reshape(-1)[0]))
         arr = (img01.clamp(0, 1)[0].permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
     return arr, achieved
 
