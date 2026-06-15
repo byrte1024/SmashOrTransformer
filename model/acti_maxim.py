@@ -239,7 +239,7 @@ def run(checkpoint_path, images_dir="images", device="cuda", out_dir="results/ac
 
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    seed_gen = torch.Generator(device=dev).manual_seed(seed0)
+    seed_gen = torch.Generator().manual_seed(seed0)   # CPU: only picks seed-image indices
     rows = []
 
     for b in BRACKETS:
