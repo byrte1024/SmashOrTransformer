@@ -63,7 +63,8 @@ def run(cfg: TrainConfig, pretrained: bool = True) -> Path:
     best_epoch = -1
     t_start = time.perf_counter()
 
-    for epoch in range(cfg.epochs):
+    epoch_bar = tqdm(range(cfg.epochs), desc="training", unit="epoch")
+    for epoch in epoch_bar:
         phase = "frozen" if epoch < cfg.freeze_epochs else "finetune"
         if epoch == 0 and cfg.freeze_epochs > 0:
             model.freeze_backbone()
@@ -75,7 +76,7 @@ def run(cfg: TrainConfig, pretrained: bool = True) -> Path:
         ep_start = time.perf_counter()
         loss_sum, n_samples, grad_norm_sum, n_batches = 0.0, 0, 0.0, 0
         loop = tqdm(train_loader, desc=f"epoch {epoch + 1}/{cfg.epochs} [{phase}]",
-                    unit="batch", leave=True)
+                    unit="batch", leave=False)
         for t, y in loop:
             t = t.to(device); y = y.to(device)
             optimizer.zero_grad()
@@ -100,11 +101,22 @@ def run(cfg: TrainConfig, pretrained: bool = True) -> Path:
             "epoch": epoch + 1, "phase": phase,
             "train_loss": loss_sum / max(1, n_samples),
             "val_loss": val["val_loss"], "val_spearman": val["spearman"],
+            "val_pearson": val["pearson"],
             "val_mae": val["mae"], "lr_head": lrs[0], "lr_backbone": lrs[1],
             "grad_norm": grad_norm_sum / max(1, n_batches),
             "epoch_seconds": time.perf_counter() - ep_start,
             "n_train_samples": n_samples, "n_val_pokemon": val["n_pokemon"]}
         logger.log_epoch(record)
+
+        # surface the epoch's loss + correlations on the persistent epoch bar
+        epoch_bar.set_postfix(train_loss=f"{record['train_loss']:.4f}",
+                              spearman=f"{val['spearman']:.3f}",
+                              pearson=f"{val['pearson']:.3f}")
+        tqdm.write(
+            f"epoch {epoch + 1}/{cfg.epochs} [{phase}]  "
+            f"train_loss={record['train_loss']:.4f}  val_loss={val['val_loss']:.4f}  "
+            f"spearman={val['spearman']:.3f}  pearson={val['pearson']:.3f}  "
+            f"mae={val['mae']:.3f}")
 
         logger.save_predictions(epoch + 1, val["ids"], val["y_true"], val["y_pred"])
 

@@ -5,7 +5,7 @@ from pathlib import Path
 import torch
 
 _HISTORY_FIELDS = ["epoch", "phase", "train_loss", "val_loss", "val_spearman",
-                   "val_mae", "lr_head", "lr_backbone", "grad_norm",
+                   "val_pearson", "val_mae", "lr_head", "lr_backbone", "grad_norm",
                    "epoch_seconds", "n_train_samples", "n_val_pokemon"]
 
 

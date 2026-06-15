@@ -1,7 +1,7 @@
 from __future__ import annotations
 import numpy as np
 import torch
-from scipy.stats import spearmanr
+from scipy.stats import spearmanr, pearsonr
 from .loss import soft_bce
 
 
@@ -18,6 +18,14 @@ def spearman(pred, true) -> float:
     if len(pred) < 2:
         return 0.0
     r = spearmanr(pred, true).correlation
+    return float(r) if r == r else 0.0
+
+
+def pearson(pred, true) -> float:
+    pred = np.asarray(pred); true = np.asarray(true)
+    if len(pred) < 2:
+        return 0.0
+    r = pearsonr(pred, true).statistic
     return float(r) if r == r else 0.0
 
 
@@ -42,6 +50,7 @@ def evaluate(model, loader, device) -> dict:
     trues = np.concatenate(all_true)
     ids = np.concatenate(all_ids)
     uniq, mean_pred, true = aggregate_per_pokemon(ids, preds, trues)
-    return {"spearman": spearman(mean_pred, true), "mae": mae(mean_pred, true),
+    return {"spearman": spearman(mean_pred, true),
+            "pearson": pearson(mean_pred, true), "mae": mae(mean_pred, true),
             "n_pokemon": len(true), "val_loss": loss_sum / max(1, n),
             "ids": uniq, "y_true": true, "y_pred": mean_pred}

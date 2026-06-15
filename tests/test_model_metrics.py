@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
-from model.metrics import aggregate_per_pokemon, spearman, mae, evaluate
+from model.metrics import aggregate_per_pokemon, spearman, pearson, mae, evaluate
 
 
 def test_aggregate_per_pokemon_means():
@@ -23,6 +23,11 @@ def test_spearman_single_point_is_zero():
     assert spearman(np.array([0.5]), np.array([0.5])) == 0.0
 
 
+def test_pearson_perfect_and_guard():
+    assert abs(pearson(np.array([1.0, 2.0, 3.0]), np.array([2.0, 4.0, 6.0])) - 1.0) < 1e-9
+    assert pearson(np.array([0.5]), np.array([0.5])) == 0.0
+
+
 def test_mae():
     assert abs(mae(np.array([0.1, 0.5]), np.array([0.2, 0.5])) - 0.05) < 1e-9
 
@@ -41,7 +46,9 @@ def test_evaluate_returns_metrics():
             pids.append(pid)
     loader = DataLoader(list(zip(xs, ys, pids)), batch_size=2)
     out = evaluate(_ConstModel(), loader, torch.device("cpu"))
-    assert {"spearman", "mae", "n_pokemon", "val_loss", "ids", "y_true", "y_pred"} == set(out)
+    assert {"spearman", "pearson", "mae", "n_pokemon", "val_loss",
+            "ids", "y_true", "y_pred"} == set(out)
     assert len(out["ids"]) == 3 and len(out["y_pred"]) == 3
     assert out["n_pokemon"] == 3
     assert out["spearman"] > 0.9
+    assert out["pearson"] > 0.9
