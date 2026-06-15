@@ -1,0 +1,20 @@
+{
+  "dataset_dir": "datasets/mixed_v1",
+  "run_name": "vit_small_mixed_v1",
+  "resolution": 224,
+  "out_dir": "runs",
+  "backbone": "vit_small_patch16_224",
+  "epochs": 30,
+  "batch_size": 64,
+  "freeze_epochs": 3,
+  "lr_head": 1e-3,
+  "lr_backbone": 2e-5,
+  "weight_decay": 0.05,
+  "warmup_epochs": 1,
+  "dropout": 0.1,
+  "amp": true,
+  "grad_clip": 1.0,
+  "num_workers": 8,
+  "seed": 0,
+  "device": "cuda"
+}
