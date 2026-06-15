@@ -59,6 +59,22 @@ def test_sampler_votes_accessible(mini_repo):
     assert isinstance(v, int) and v > 0
 
 
+def test_flat_aug_config_builds_and_samples(mini_repo, tmp_path):
+    # old pre-source-aware flat augmentations schema must still build + sample
+    cfg = DataConfig.from_dict({"name": "flat", "resolution": 32, "minimages": 1,
+                                "variations": 2,
+                                "split": {"strategy": "image", "val_frac": 0.0},
+                                "augmentations": {
+                                    "scale": {"w": [0.8, 1.0], "h": [0.8, 1.0]},
+                                    "scale_method": "bilinear", "rotation": [-5, 5],
+                                    "background": {"mode": "white"}}})
+    out = prepare(cfg, mini_repo["images"], mini_repo["labels"], tmp_path / "datasets")
+    ds = DataSampler(out, split="train", epoch=0)
+    img, label = ds[0]
+    assert img.shape == (32, 32, 3) and img.dtype.name == "uint8"
+    assert 0.0 <= label <= 1.0
+
+
 def test_sampler_routes_booru_through_photo_aug(mini_repo, tmp_path):
     # give pokemon 1 a booru image; build a booru+portrait dataset
     import csv as _csv

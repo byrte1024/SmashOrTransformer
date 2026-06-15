@@ -116,6 +116,18 @@ def test_booru_is_a_valid_category():
     assert cfg.selection.categories == ["booru"]
 
 
+def test_validate_rejects_bad_crop_scale():
+    with pytest.raises(ValueError):
+        DataConfig.from_dict({"name": "d", "resolution": 8,
+                              "augmentations": {"photo": {"crop_scale": [0.0, 1.0]}}})
+
+
+def test_validate_rejects_bad_flip():
+    with pytest.raises(ValueError):
+        DataConfig.from_dict({"name": "d", "resolution": 8,
+                              "augmentations": {"sprite": {"flip": 1.5}}})
+
+
 def test_roundtrip_nested(tmp_path=None):
     cfg = DataConfig.from_dict({"name": "d", "resolution": 96,
                                 "selection": {"categories": ["portrait", "booru"]},

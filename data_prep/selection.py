@@ -11,6 +11,7 @@ _GEN_RE = re.compile(r"^gen(\d+)_")
 # Pillow cannot open SVG. dream_world sprites are SVG, so they are skipped here
 # and never enter the dataset. To include them, rasterize SVG to PNG upstream.
 _UNSUPPORTED_SUFFIXES = {".svg"}
+_BOORU_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
 
 
 def gen_of(source_name: str) -> int:
@@ -64,9 +65,11 @@ def load_records(images_dir, pokemon_id: int,
     if booru_meta.exists():
         with open(booru_meta, newline="") as f:
             for row in csv.DictReader(f):
-                fp = next(iter((folder / "booru").glob(f"*_{row['post_id']}.*")), None)
-                if fp is None or fp.name == "meta.csv":
+                cand = [f for f in (folder / "booru").glob(f"*_{row['post_id']}.*")
+                        if f.suffix.lower() in _BOORU_EXTS]
+                if not cand:
                     continue
+                fp = cand[0]
                 recs.append(ImageRecord(
                     pokemon_id=pokemon_id, source_name=fp.stem, category="booru",
                     gen=0, path=fp, smash_pct=smash, total_votes=votes,

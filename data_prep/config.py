@@ -209,6 +209,12 @@ class DataConfig:
         for c in self.selection.categories:
             if c not in CATEGORIES:
                 raise ValueError(f"unknown category {c!r}")
+        lo, hi = self.augmentations.photo.crop_scale
+        if not (0.0 < lo <= hi <= 1.0):
+            raise ValueError("photo.crop_scale must satisfy 0 < lo <= hi <= 1")
+        for fl in (self.augmentations.sprite.flip, self.augmentations.photo.flip):
+            if not (0.0 <= fl <= 1.0):
+                raise ValueError("flip probability must be in [0,1]")
         if self.variations.mode == "flat" and (self.variations.n or 0) < 1:
             raise ValueError("flat variations must be >= 1")
 
