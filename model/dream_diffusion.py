@@ -134,7 +134,8 @@ def run(checkpoint_path, out_dir="results/dream_diffusion", device="cuda",
         pipe = load_pipeline(model_id, device)
 
     out = Path(out_dir)
-    rows = []
+    prior = _load_manifest(out / "manifest.csv")   # resume: rows already computed
+    rows, n_new, n_skip = [], 0, 0
     for method in methods:
         strat = strategies[method]
         for cond_tag, prompt in prompts:
@@ -144,14 +145,23 @@ def run(checkpoint_path, out_dir="results/dream_diffusion", device="cuda",
                 tiles = []
                 for k in range(n_per):
                     seed = seed0 + k
+                    png = cell / f"{seed:03d}.png"
+                    key = (method, cond_tag, b, seed)
+                    if png.exists():                # skip already-generated images
+                        tiles.append(Image.open(png).convert("RGB"))
+                        if key in prior:
+                            rows.append(prior[key])
+                        n_skip += 1
+                        continue
                     img = strat.generate(pipe, smash_model, prompt, b, seed, mean, std)
                     raw, cal = score_pil(smash_model, cfg, img, calib, device)
-                    _label(img, f"raw {raw:.0f}% -> {cal:.0f}%").save(cell / f"{seed:03d}.png")
+                    _label(img, f"raw {raw:.0f}% -> {cal:.0f}%").save(png)
                     tiles.append(_label(img, f"{cal:.0f}%"))
                     rows.append({"method": method, "conditioning": cond_tag, "prompt": prompt,
                                  "target": b, "seed": seed,
                                  "achieved_raw_pct": round(raw, 2),
                                  "achieved_calibrated_pct": round(cal, 2)})
+                    n_new += 1
                 _grid(tiles).save(out / f"grid_{method}_{cond_tag}_{b:.1f}.png")
 
     with open(out / "manifest.csv", "w", newline="") as f:
@@ -159,7 +169,8 @@ def run(checkpoint_path, out_dir="results/dream_diffusion", device="cuda",
                                           "seed", "achieved_raw_pct", "achieved_calibrated_pct"])
         w.writeheader(); w.writerows(rows)
 
-    print(f"\nGenerated {len(rows)} images -> {out}/")
+    print(f"\nGenerated {n_new} new images ({n_skip} skipped, already present) "
+          f"-> {out}/")
     for method in methods:
         for b in brackets:
             cal_vals = [r["achieved_calibrated_pct"] for r in rows
@@ -175,10 +186,29 @@ def _build_strategies(steps, guidance_scale, sd_guidance_scale):
             "sds": SdsGuidance(steps, guidance_scale, sd_guidance_scale)}
 
 
+def _load_manifest(path):
+    """Read an existing manifest.csv into {(method,cond,target,seed): row} so a
+    resumed run keeps the rows of skipped images. Coerces types to match
+    freshly-built rows (so the end-of-run summary stats work uniformly)."""
+    if not Path(path).exists():
+        return {}
+    out = {}
+    with open(path, newline="") as f:
+        for r in csv.DictReader(f):
+            r["target"] = float(r["target"]); r["seed"] = int(r["seed"])
+            r["achieved_raw_pct"] = float(r["achieved_raw_pct"])
+            r["achieved_calibrated_pct"] = float(r["achieved_calibrated_pct"])
+            out[(r["method"], r["conditioning"], r["target"], r["seed"])] = r
+    return out
+
+
 def _embed(pipe, prompt):
     """Concatenated [uncond, cond] text embeddings for classifier-free guidance."""
     prompt_embeds, neg_embeds = pipe.encode_prompt(prompt, pipe.device, 1, True, negative_prompt="")
-    return torch.cat([neg_embeds, prompt_embeds]).to(next(pipe.unet.parameters()).dtype)
+    # detach: we never want gradients w.r.t. the prompt, and the text encoder is
+    # not frozen, so a live graph here would be freed after the first backward()
+    # and break DOODL's multi-iteration loop ("backward a second time").
+    return torch.cat([neg_embeds, prompt_embeds]).to(next(pipe.unet.parameters()).dtype).detach()
 
 
 def _decode01(pipe, latents):

@@ -1,3 +1,4 @@
+from pathlib import Path
 import numpy as np
 import torch
 from PIL import Image
@@ -77,6 +78,35 @@ def test_run_orchestration_with_stub(mini_repo, tmp_path):
             "achieved_raw_pct", "achieved_calibrated_pct"} == set(rows[0].keys())
     # brackets recorded in reverse order (1.0 before 0.0) within a cell grouping
     assert rows[0]["target"] == "1.0"
+
+
+class _CountingStub(dd.GuidanceStrategy):
+    def __init__(self): self.n = 0
+    def generate(self, pipe, smash_model, prompt, target, seed, mean, std):
+        self.n += 1
+        return Image.fromarray(np.full((32, 32, 3), int(target * 255), np.uint8), "RGB")
+
+
+def test_run_skips_existing_images_on_resume(mini_repo, tmp_path):
+    ckpt = _trained(mini_repo, tmp_path)
+    out_dir = str(tmp_path / "dream")
+    kwargs = dict(out_dir=out_dir, device="cpu", methods=["stub"],
+                  prompts=[("uncond", "")], brackets=[1.0, 0.0], n_per=2)
+
+    first = _CountingStub()
+    dd.run(ckpt, strategies={"stub": first}, pipe=object(), **kwargs)
+    assert first.n == 4                                   # 1*1*2*2 generated fresh
+    manifest1 = list(_csv.DictReader(open(Path(out_dir) / "manifest.csv")))
+    assert len(manifest1) == 4
+
+    # second run over the same out_dir: every image already exists -> 0 regenerated,
+    # manifest still complete (rows carried forward from the prior manifest)
+    second = _CountingStub()
+    dd.run(ckpt, strategies={"stub": second}, pipe=object(), **kwargs)
+    assert second.n == 0
+    manifest2 = list(_csv.DictReader(open(Path(out_dir) / "manifest.csv")))
+    assert len(manifest2) == 4
+    assert {r["seed"] for r in manifest2} == {r["seed"] for r in manifest1}
 
 
 def test_score_pil_in_range(mini_repo, tmp_path):
