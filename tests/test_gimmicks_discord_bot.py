@@ -123,12 +123,14 @@ def test_ahash_same_and_different():
     assert bot.ahash(structured(True)) != bot.ahash(structured(False))
 
 
-def test_build_prompt_diss_vs_compliment_and_markers():
+def test_build_prompt_frames_gut_vs_mind_and_markers():
     s = bot.build_prompt("/tmp/x.png", 82, True)
     p = bot.build_prompt("/tmp/x.png", 7, False)
-    assert "COMPLIMENT" in s and "DISS" in p
+    assert "82%" in s and "SMASH" in s
+    assert "7%" in p and "PASS" in p
     for txt in (s, p):
         assert "ASCII" in txt and "~?" in txt and "?~" in txt
+        assert "CONTRADICT" in txt          # the mind may disagree with the gut/score
 
 
 def test_parse_reply_extracts_strips_and_falls_back():

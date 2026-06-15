@@ -158,12 +158,18 @@ class ExplanationCache:
 
 
 def build_prompt(image_path, cal_pct, smash) -> str:
-    mood = ("a short, witty COMPLIMENT" if smash else "a short, playful DISS")
-    return (f"Look at the image at {image_path}. A model rated it {cal_pct:.0f}% "
-            f"'smashable' ({'SMASH' if smash else 'PASS'}). Give {mood} about how it "
-            f"looks that explains the rating. Rules: ONE short sentence, ASCII "
-            f"characters only, no emoji. Output ONLY the sentence wrapped exactly as "
-            f"~? your sentence here ?~ with nothing before or after.")
+    gut = "SMASH" if smash else "PASS"
+    return (
+        f"Look at the image at {image_path}. On instinct your gut blurted out "
+        f"{cal_pct:.0f}% smashable ({gut}) -- treat that score as your gut/senses, "
+        f"not a fact. Now actually study the image and react with your MIND. "
+        f"If your gut was right, lean in: a witty compliment if the score is high, "
+        f"a playful diss if it is low. But if your gut was clearly WRONG -- e.g. it "
+        f"is static/noise, an adversarial mess, a random object, or just nothing "
+        f"attractive -- openly CONTRADICT the score and call your gut out (e.g. "
+        f"\"82%? what was I thinking?\"). "
+        f"Rules: ONE short sentence, ASCII only, no emoji. Output ONLY the sentence "
+        f"wrapped exactly as ~? your sentence here ?~ with nothing before or after.")
 
 
 _REPLY_RE = re.compile(r"~\?(.*?)\?~", re.S)
