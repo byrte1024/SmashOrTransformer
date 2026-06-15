@@ -4,7 +4,7 @@
   "seed": 0,
   "minimages": 3,
   "selection": {"categories": ["portrait", "in-game", "booru"]},
-  "variations": 1,
+  "variations": {"fill_so": null},
   "split": {"strategy": "pokemon", "val_frac": 0.1},
   "augmentations": {
     "sprite": {
