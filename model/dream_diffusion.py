@@ -295,3 +295,28 @@ class SdsGuidance(GuidanceStrategy):
             opt.step()
         with torch.no_grad():
             return to_pil(_decode01(pipe, latents.detach()))
+
+
+def main(argv=None):
+    p = argparse.ArgumentParser(description="Diffusion dreaming: plausible score-targeted images.")
+    p.add_argument("--checkpoint", required=True)
+    p.add_argument("--out", default="results/dream_diffusion")
+    p.add_argument("--device", default="cuda")
+    p.add_argument("--model-id", default=DEFAULT_MODEL_ID)
+    p.add_argument("--methods", default="xhat,doodl,sds")
+    p.add_argument("--brackets", default="1.0,0.8,0.6,0.4,0.2,0.0")
+    p.add_argument("--n-per", type=int, default=4)
+    p.add_argument("--steps", type=int, default=30)
+    p.add_argument("--guidance-scale", type=float, default=200.0)
+    p.add_argument("--sd-guidance-scale", type=float, default=7.5)
+    p.add_argument("--seed0", type=int, default=0)
+    args = p.parse_args(argv)
+    run(args.checkpoint, out_dir=args.out, device=args.device, model_id=args.model_id,
+        methods=args.methods.split(","),
+        brackets=[float(b) for b in args.brackets.split(",")],
+        n_per=args.n_per, steps=args.steps, guidance_scale=args.guidance_scale,
+        sd_guidance_scale=args.sd_guidance_scale, seed0=args.seed0)
+
+
+if __name__ == "__main__":
+    main()
