@@ -40,6 +40,12 @@ from model.calibrate import apply_calibration
 # --------------------------------------------------------------------------- #
 # pure helpers (tested)
 # --------------------------------------------------------------------------- #
+def is_explicit_mention(content: str, bot_id) -> bool:
+    """True only if the bot was @'d in the message text. A reply-ping is NOT in
+    the content, so this ignores 'mentioned via reply' (unlike mentioned_in)."""
+    return f"<@{bot_id}>" in (content or "") or f"<@!{bot_id}>" in (content or "")
+
+
 def pick_source(has_attachment, has_reply_image, said_me, has_other_mention) -> str:
     """Resolve which image to rate, by priority. Returns one of:
     'attachment' | 'reply' | 'me' | 'mention' | 'none'."""
@@ -74,6 +80,40 @@ def read_model_path(path) -> str:
     """Read the model checkpoint path from thebestofthebest.txt (first line)."""
     return _first_line(path, "model checkpoint path",
                        'echo "runs/<run>/checkpoints/best.pt" > {p}')
+
+
+def model_tag(path) -> str:
+    """Short label for a checkpoint, e.g. runs/<run>/checkpoints/best.pt ->
+    '<run>/best'. Used to show which model produced a rating."""
+    p = Path(path)
+    if p.parent.name == "checkpoints":
+        return f"{p.parent.parent.name}/{p.stem}"
+    return p.stem
+
+
+class ModelLoader:
+    """Loads the model lazily and RELOADS it whenever the resolved path or its
+    `stamp` changes -- so a freshly written best.pt (or regenerated
+    calibration.json) is picked up between requests without restarting the bot.
+    The default stamp is the path's mtime; the bot passes one that also covers
+    the sibling calibration.json."""
+    def __init__(self, resolve_path, load, stamp=None):
+        self._resolve = resolve_path        # () -> checkpoint path
+        self._load = load                   # (path) -> bundle
+        self._stamp = stamp or (lambda p: os.path.getmtime(p))
+        self._key = None
+        self._value = None
+
+    def get(self):
+        """Return (bundle, path, reloaded_bool)."""
+        path = self._resolve()
+        key = (path, self._stamp(path))
+        reloaded = False
+        if key != self._key:
+            self._value = self._load(path)
+            self._key = key
+            reloaded = True
+        return self._value, path, reloaded
 
 
 def _rgba_from_bytes(data: bytes) -> np.ndarray:
@@ -231,7 +271,8 @@ def get_explanation(cache, data, cal_pct, smash, model):
 # --------------------------------------------------------------------------- #
 # discord wiring (lazy import; needs a token + gateway)
 # --------------------------------------------------------------------------- #
-def run(checkpoint_path, token_path="gimmicks/secret.txt", device="cuda", threshold=0.5,
+def run(checkpoint_path=None, model_file="gimmicks/thebestofthebest.txt",
+        token_path="gimmicks/secret.txt", device="cuda", threshold=0.5,
         settings_path="gimmicks/settings.json", light_llm=None,
         cache_path="gimmicks/llm_cache.json"):
     import discord
@@ -241,9 +282,21 @@ def run(checkpoint_path, token_path="gimmicks/secret.txt", device="cuda", thresh
     use_llm = settings["light_llm"] if light_llm is None else light_llm
     llm_model = settings["llm_model"]
     cache = ExplanationCache(cache_path) if use_llm else None
-    model, cfg = load_model(checkpoint_path, device=device, pretrained=False)
-    calib = load_calibration(checkpoint_path, fit="auto")
-    dev = next(model.parameters()).device
+
+    def _resolve():               # re-read the file each time so it can be re-pointed live
+        return checkpoint_path or read_model_path(model_file)
+
+    def _load(path):
+        m, c = load_model(path, device=device, pretrained=False)
+        return m, c, load_calibration(path, fit="auto")   # reads calibration.json next to path
+
+    def _stamp(path):
+        # reload if the checkpoint OR its calibration.json changes
+        p = Path(path)
+        cj = p.parent / "calibration.json"
+        return (os.path.getmtime(p), os.path.getmtime(cj) if cj.exists() else 0.0)
+
+    loader = ModelLoader(_resolve, _load, stamp=_stamp)
 
     intents = discord.Intents.default()
     intents.message_content = True
@@ -261,8 +314,10 @@ def run(checkpoint_path, token_path="gimmicks/secret.txt", device="cuda", thresh
 
     @client.event
     async def on_message(message):
-        if message.author.bot or not client.user.mentioned_in(message) or message.mention_everyone:
+        if message.author.bot or message.mention_everyone:
             return
+        if not is_explicit_mention(message.content, client.user.id):
+            return            # ignore reply-pings; require an explicit @mention
 
         attach = await first_image_attachment(message)
         reply_attach = None
@@ -294,6 +349,10 @@ def run(checkpoint_path, token_path="gimmicks/secret.txt", device="cuda", thresh
             return
 
         async with message.channel.typing():
+            (model, cfg, calib), path, reloaded = await asyncio.to_thread(loader.get)
+            if reloaded:
+                print(f"using model: {path}")
+            dev = next(model.parameters()).device
             try:
                 raw, cal, smash, png = await asyncio.to_thread(
                     rate_bytes, model, cfg, calib, data, dev, threshold)
@@ -305,6 +364,7 @@ def run(checkpoint_path, token_path="gimmicks/secret.txt", device="cuda", thresh
                 exp = await asyncio.to_thread(get_explanation, cache, data, cal, smash, llm_model)
                 if exp:
                     text += f"\n> {exp}"
+            text += f"\n-# model: {model_tag(path)}"
         await message.reply(text, file=discord.File(BytesIO(png), filename="rating.png"))
 
     client.run(token)
@@ -324,8 +384,8 @@ def main(argv=None):
     p.add_argument("--device", default="cuda")
     p.add_argument("--threshold", type=float, default=0.5)
     args = p.parse_args(argv)
-    checkpoint = args.checkpoint or read_model_path(args.model_file)
-    run(checkpoint, token_path=args.token, device=args.device, threshold=args.threshold,
+    run(checkpoint_path=args.checkpoint, model_file=args.model_file,
+        token_path=args.token, device=args.device, threshold=args.threshold,
         settings_path=args.settings, light_llm=args.light_llm,
         cache_path=str(here / "llm_cache.json"))
 

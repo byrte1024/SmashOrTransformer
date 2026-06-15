@@ -176,3 +176,86 @@ def test_broken_image_raises_and_has_message():
     # rate_bytes propagates the error (model never reached for a broken image)
     with _pytest.raises(Exception):
         bot.rate_bytes(None, None, None, b"not an image", device="cpu")
+
+
+def test_is_explicit_mention_ignores_reply_pings():
+    bid = 123456
+    assert bot.is_explicit_mention(f"<@{bid}> rate this", bid)      # typed @mention
+    assert bot.is_explicit_mention(f"hey <@!{bid}> me", bid)        # nickname-form mention
+    assert not bot.is_explicit_mention("just replying, no @", bid)  # reply ping (no token)
+    assert not bot.is_explicit_mention("<@999> rate this", bid)     # someone else @'d
+    assert not bot.is_explicit_mention("", bid)
+
+
+def test_model_loader_reloads_on_mtime_and_path_change(tmp_path):
+    import os
+    f = tmp_path / "best.pt"; f.write_bytes(b"x"); os.utime(f, (1000, 1000))
+    n = {"c": 0}
+    def load(p):
+        n["c"] += 1
+        return ("model", p)
+    loader = bot.ModelLoader(lambda: str(f), load)
+
+    bundle, path, reloaded = loader.get()
+    assert reloaded and n["c"] == 1 and path == str(f)
+    _, _, reloaded = loader.get()
+    assert not reloaded and n["c"] == 1                  # unchanged -> cached
+
+    os.utime(f, (2000, 2000))                            # best.pt rewritten
+    _, _, reloaded = loader.get()
+    assert reloaded and n["c"] == 2                      # picks up the newer file
+
+    g = tmp_path / "best2.pt"; g.write_bytes(b"y"); os.utime(g, (1000, 1000))
+    cur = {"p": str(f)}
+    loader2 = bot.ModelLoader(lambda: cur["p"], load)
+    loader2.get()
+    cur["p"] = str(g)                                    # re-pointed to a new model
+    _, path, reloaded = loader2.get()
+    assert reloaded and path == str(g)
+
+
+def test_model_tag():
+    assert bot.model_tag("runs/vit_small_mixed_v1/checkpoints/best.pt") == "vit_small_mixed_v1/best"
+    assert bot.model_tag("runs/foo/checkpoints/epoch_012.pt") == "foo/epoch_012"
+    assert bot.model_tag("/tmp/whatever.pt") == "whatever"     # non-standard path
+
+
+def test_model_loader_reloads_on_mtime_and_path_change(tmp_path):
+    import os
+    f = tmp_path / "best.pt"; f.write_bytes(b"x"); os.utime(f, (1000, 1000))
+    n = {"c": 0}
+    def load(p):
+        n["c"] += 1
+        return ("model", p)
+    loader = bot.ModelLoader(lambda: str(f), load)
+
+    _, path, reloaded = loader.get()
+    assert reloaded and n["c"] == 1 and path == str(f)
+    _, _, reloaded = loader.get()
+    assert not reloaded and n["c"] == 1                  # unchanged -> cached
+    os.utime(f, (2000, 2000))                            # best.pt rewritten
+    _, _, reloaded = loader.get()
+    assert reloaded and n["c"] == 2                      # picks up the newer file
+
+    g = tmp_path / "best2.pt"; g.write_bytes(b"y"); os.utime(g, (1000, 1000))
+    cur = {"p": str(f)}
+    loader2 = bot.ModelLoader(lambda: cur["p"], load)
+    loader2.get()
+    cur["p"] = str(g)                                    # re-pointed to a new model
+    _, path, reloaded = loader2.get()
+    assert reloaded and path == str(g)
+
+
+def test_model_loader_reloads_on_stamp_change_same_path():
+    # custom stamp (e.g. calibration.json mtime) forces reload even if path is fixed
+    n = {"c": 0}
+    s = {"v": 1}
+    loader = bot.ModelLoader(lambda: "x",
+                             lambda p: (n.__setitem__("c", n["c"] + 1) or n["c"]),
+                             stamp=lambda p: s["v"])
+    loader.get()
+    _, _, r = loader.get()
+    assert not r and n["c"] == 1            # same stamp -> cached
+    s["v"] = 2                              # e.g. calibration.json regenerated
+    _, _, r = loader.get()
+    assert r and n["c"] == 2                # reloaded -> picks up new calibration
