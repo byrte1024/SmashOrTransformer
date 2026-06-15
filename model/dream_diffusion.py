@@ -212,8 +212,10 @@ def _embed(pipe, prompt):
 
 
 def _decode01(pipe, latents):
-    """VAE-decode latents -> image in [0,1]."""
-    img = pipe.vae.decode(latents / pipe.vae.config.scaling_factor).sample
+    """VAE-decode latents -> image in [0,1]. Casts to the VAE dtype so callers
+    may keep latents in fp32 (DOODL) while the VAE runs fp16."""
+    vdtype = next(pipe.vae.parameters()).dtype
+    img = pipe.vae.decode(latents.to(vdtype) / pipe.vae.config.scaling_factor).sample
     return (img / 2 + 0.5).clamp(0, 1)
 
 
@@ -272,22 +274,28 @@ class DoodlGuidance(GuidanceStrategy):
         self.opt_iters, self.lr = opt_iters, lr
 
     def _sample(self, pipe, emb, latents, dev):
+        # latents stay in their own dtype (fp32 for the optimized DOODL latent);
+        # only the heavy UNet forward runs in the model dtype (fp16 on cuda).
+        udtype = next(pipe.unet.parameters()).dtype
         pipe.scheduler.set_timesteps(self.steps, device=dev)
         for t in pipe.scheduler.timesteps:
             lat_in = pipe.scheduler.scale_model_input(torch.cat([latents] * 2), t)
-            noise = pipe.unet(lat_in, t, encoder_hidden_states=emb).sample
+            noise = pipe.unet(lat_in.to(udtype), t, encoder_hidden_states=emb).sample
             n_unc, n_cond = noise.chunk(2)
-            noise = n_unc + self.sd * (n_cond - n_unc)
+            noise = (n_unc + self.sd * (n_cond - n_unc)).to(latents.dtype)
             latents = pipe.scheduler.step(noise, t, latents).prev_sample
         return latents
 
     def generate(self, pipe, smash_model, prompt, target, seed, mean, std):
         dev = pipe.device
-        dtype = next(pipe.unet.parameters()).dtype
         emb = _embed(pipe, prompt)
         res = _smash_res(smash_model)
         gen = torch.Generator(device="cpu").manual_seed(seed)
-        z0 = torch.randn(1, 4, 64, 64, generator=gen).to(dev, dtype) * pipe.scheduler.init_noise_sigma
+        # optimize the latent in fp32: Adam's eps underflows to 0 in fp16, which
+        # sends the latent to NaN and decodes to a black image.
+        z0 = (torch.randn(1, 4, 64, 64, generator=gen) * pipe.scheduler.init_noise_sigma
+              ).to(dev, torch.float32)
+        init_norm = float(z0.norm())
         z0 = z0.detach().requires_grad_(True)
         opt = torch.optim.Adam([z0], lr=self.lr)
         for _ in range(self.opt_iters):
@@ -297,6 +305,8 @@ class DoodlGuidance(GuidanceStrategy):
             loss = ((_score_tensor(smash_model, img01, mean, std, res) - target) ** 2).mean()
             loss.backward()
             opt.step()
+            with torch.no_grad():       # renormalize back onto the noise manifold
+                z0.mul_(init_norm / (z0.norm() + 1e-8))
         with torch.no_grad():
             return to_pil(_decode01(pipe, self._sample(pipe, emb, z0.detach(), dev)))
 
