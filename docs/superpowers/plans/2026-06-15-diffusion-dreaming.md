@@ -96,7 +96,7 @@ import torch
 import torch.nn.functional as F
 from PIL import Image, ImageDraw, ImageFont
 from .infer import load_model, load_calibration
-from .dataset import canonical_render, to_tensor
+from .dataset import render_input, to_tensor
 from .calibrate import apply_calibration
 
 DEFAULT_PROMPTS = [
@@ -225,7 +225,7 @@ def score_pil(smash_model, cfg, pil, calib, device="cuda") -> tuple[float, float
     """Score a generated image with the calibrated model -> (raw%, calibrated%)."""
     dev = torch.device(device if (device != "cuda" or torch.cuda.is_available()) else "cpu")
     arr = np.asarray(pil.convert("RGBA"), dtype=np.uint8)
-    img = canonical_render(arr, cfg.resolution)
+    img = render_input(arr, cfg.resolution, True)   # stretch-to-square, matches eval
     t = to_tensor(img, smash_model.data_config["mean"], smash_model.data_config["std"])
     t = t.unsqueeze(0).to(dev)
     with torch.no_grad():
