@@ -12,8 +12,8 @@ All non-GUI logic lives in pure helpers (find_models / find_checkpoints /
 list_images / build_result_image / _parse_drop) that are unit-tested; pygame is
 imported lazily inside the GUI builder so this module imports headlessly.
 
-    uv run python -m model.score_image_app            # auto-discovers runs/
-    uv run python -m model.score_image_app --checkpoint runs/<run>/checkpoints/best.pt
+    uv run python -m gimmicks.score_image_app            # auto-discovers runs/
+    uv run python -m gimmicks.score_image_app --checkpoint runs/<run>/checkpoints/best.pt
 """
 from __future__ import annotations
 import argparse
@@ -21,9 +21,9 @@ import re
 from pathlib import Path
 from PIL import Image
 from data_prep.prepare import load_sprite
-from .dataset import canonical_render
-from .infer import load_model, load_calibration, score_image
-from .results import annotate_portrait
+from model.dataset import canonical_render
+from model.infer import load_model, load_calibration, score_image
+from model.results import annotate_portrait
 
 # formats Pillow opens; animated ones (gif/webp) use their first frame via
 # load_sprite. jfif/jpe are JPEG variants.

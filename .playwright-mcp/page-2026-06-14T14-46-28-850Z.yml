@@ -1,0 +1,724 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e6] [cursor=pointer]: menu
+    - link [ref=e7] [cursor=pointer]:
+      - /url: /
+    - link "Log In" [ref=e9] [cursor=pointer]:
+      - /url: /user_login/
+  - generic [ref=e10]:
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - link "#" [ref=e14] [cursor=pointer]:
+          - /url: /game_boy_advance/0/
+        - link "A" [ref=e15] [cursor=pointer]:
+          - /url: /game_boy_advance/A/
+        - link "B" [ref=e16] [cursor=pointer]:
+          - /url: /game_boy_advance/B/
+        - link "C" [ref=e17] [cursor=pointer]:
+          - /url: /game_boy_advance/C/
+        - link "D" [ref=e18] [cursor=pointer]:
+          - /url: /game_boy_advance/D/
+        - link "E" [ref=e19] [cursor=pointer]:
+          - /url: /game_boy_advance/E/
+        - link "F" [ref=e20] [cursor=pointer]:
+          - /url: /game_boy_advance/F/
+        - link "G" [ref=e21] [cursor=pointer]:
+          - /url: /game_boy_advance/G/
+        - link "H" [ref=e22] [cursor=pointer]:
+          - /url: /game_boy_advance/H/
+        - link "I" [ref=e23] [cursor=pointer]:
+          - /url: /game_boy_advance/I/
+        - link "J" [ref=e24] [cursor=pointer]:
+          - /url: /game_boy_advance/J/
+        - link "K" [ref=e25] [cursor=pointer]:
+          - /url: /game_boy_advance/K/
+        - link "L" [ref=e26] [cursor=pointer]:
+          - /url: /game_boy_advance/L/
+        - link "M" [ref=e27] [cursor=pointer]:
+          - /url: /game_boy_advance/M/
+        - link "N" [ref=e28] [cursor=pointer]:
+          - /url: /game_boy_advance/N/
+        - link "O" [ref=e29] [cursor=pointer]:
+          - /url: /game_boy_advance/O/
+        - link "P" [ref=e30] [cursor=pointer]:
+          - /url: /game_boy_advance/P/
+        - link "Q" [ref=e31] [cursor=pointer]:
+          - /url: /game_boy_advance/Q/
+        - link "R" [ref=e32] [cursor=pointer]:
+          - /url: /game_boy_advance/R/
+        - link "S" [ref=e33] [cursor=pointer]:
+          - /url: /game_boy_advance/S/
+        - link "T" [ref=e34] [cursor=pointer]:
+          - /url: /game_boy_advance/T/
+        - link "U" [ref=e35] [cursor=pointer]:
+          - /url: /game_boy_advance/U/
+        - link "V" [ref=e36] [cursor=pointer]:
+          - /url: /game_boy_advance/V/
+        - link "W" [ref=e37] [cursor=pointer]:
+          - /url: /game_boy_advance/W/
+        - link "X" [ref=e38] [cursor=pointer]:
+          - /url: /game_boy_advance/X/
+        - link "Y" [ref=e39] [cursor=pointer]:
+          - /url: /game_boy_advance/Y/
+        - link "Z" [ref=e40] [cursor=pointer]:
+          - /url: /game_boy_advance/Z/
+      - link "Sounds" [ref=e42] [cursor=pointer]:
+        - /url: https://sounds.spriters-resource.com/game_boy_advance/pokemonemerald/
+      - heading "Pokémon Emerald" [level=1] [ref=e43]
+      - separator [ref=e44]
+      - generic [ref=e45]:
+        - generic [ref=e47]:
+          - generic "Pokémon Emerald" [ref=e48]
+          - img "Pokémon Emerald - Pokémon Emerald" [ref=e50]
+        - table [ref=e52]:
+          - rowgroup [ref=e56]:
+            - row "Game Info arrow_drop_down favorite" [ref=e57]:
+              - columnheader "Game Info arrow_drop_down favorite" [ref=e58]:
+                - text: Game Info
+                - generic "Expand/Collapse All Sections" [ref=e59] [cursor=pointer]: arrow_drop_down
+                - generic "Favorited 39 times!": favorite
+            - row "Category Game Boy Advance" [ref=e60]:
+              - cell "Category" [ref=e61]
+              - cell "Game Boy Advance" [ref=e62]:
+                - link "Game Boy Advance" [ref=e63] [cursor=pointer]:
+                  - /url: /game_boy_advance/
+            - row "Assets 70" [ref=e64]:
+              - cell "Assets" [ref=e65]
+              - cell "70" [ref=e66]
+            - row "Hits 1,981,744" [ref=e67]:
+              - cell "Hits" [ref=e68]
+              - cell "1,981,744" [ref=e69]
+            - row "Comments 11" [ref=e70]:
+              - cell "Comments" [ref=e71]
+              - cell "11" [ref=e72]:
+                - link "11" [ref=e73] [cursor=pointer]:
+                  - /url: "#comment_list"
+            - 'row "Tags (10): arrow_right Company Game Freak Company Nintendo Genre Action Genre Adventure Genre Role-playing (RPG) Genre Turn-based Strategy (TBS) Series Pokémon Perspective Bird view / Isometric" [ref=e74]':
+              - 'cell "Tags (10): arrow_right Company Game Freak Company Nintendo Genre Action Genre Adventure Genre Role-playing (RPG) Genre Turn-based Strategy (TBS) Series Pokémon Perspective Bird view / Isometric" [ref=e75]':
+                - text: "Tags (10):"
+                - generic [ref=e76] [cursor=pointer]: arrow_right
+                - generic [ref=e77]:
+                  - link "Company Game Freak" [ref=e78] [cursor=pointer]:
+                    - /url: /browse/games/?tags%5B1%5D%5B0%5D=309
+                  - link "Company Nintendo" [ref=e79] [cursor=pointer]:
+                    - /url: /browse/games/?tags%5B1%5D%5B0%5D=79
+                  - link "Genre Action" [ref=e80] [cursor=pointer]:
+                    - /url: /browse/games/?tags%5B5%5D%5B0%5D=13413
+                  - link "Genre Adventure" [ref=e81] [cursor=pointer]:
+                    - /url: /browse/games/?tags%5B5%5D%5B0%5D=9
+                  - link "Genre Role-playing (RPG)" [ref=e82] [cursor=pointer]:
+                    - /url: /browse/games/?tags%5B5%5D%5B0%5D=55
+                  - link "Genre Turn-based Strategy (TBS)" [ref=e83] [cursor=pointer]:
+                    - /url: /browse/games/?tags%5B5%5D%5B0%5D=202
+                  - link "Series Pokémon" [ref=e84] [cursor=pointer]:
+                    - /url: /browse/games/?tags%5B2%5D%5B0%5D=220
+                  - link "Perspective Bird view / Isometric" [ref=e85] [cursor=pointer]:
+                    - /url: /browse/games/?tags%5B0%5D%5B0%5D=57
+            - 'row "Alternative Names (5): arrow_right" [ref=e86]':
+              - 'cell "Alternative Names (5): arrow_right" [ref=e87]':
+                - text: "Alternative Names (5):"
+                - generic [ref=e88] [cursor=pointer]: arrow_right
+      - link "add_circle Add Asset" [ref=e90] [cursor=pointer]:
+        - /url: /addasset/game_boy_advance/pokemonemerald/
+        - generic: add_circle
+        - text: Add Asset
+      - generic [ref=e92]:
+        - generic [ref=e93] [cursor=pointer]:
+          - generic [ref=e94]: arrow_drop_down
+          - generic [ref=e95]: "[2]"
+          - text: Playable Characters
+        - generic [ref=e96]:
+          - link "Brendan Brendan - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8324/
+            - generic [ref=e97] [cursor=pointer]:
+              - generic "Brendan" [ref=e98]
+              - img "Brendan - Pokémon Emerald" [ref=e100]
+          - link "May May - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8325/
+            - generic [ref=e101] [cursor=pointer]:
+              - generic "May" [ref=e102]
+              - img "May - Pokémon Emerald" [ref=e104]
+        - generic [ref=e105] [cursor=pointer]:
+          - generic [ref=e106]: arrow_drop_down
+          - generic [ref=e107]: "[7]"
+          - text: Non-Playable Characters
+        - generic [ref=e108]:
+          - link "Frontier Brains Frontier Brains - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8331/
+            - generic [ref=e109] [cursor=pointer]:
+              - generic "Frontier Brains" [ref=e110]
+              - img "Frontier Brains - Pokémon Emerald" [ref=e112]
+          - link "Gym Leaders & Elite Four Gym Leaders & Elite Four - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/523725/
+            - generic [ref=e113] [cursor=pointer]:
+              - generic "Gym Leaders & Elite Four" [ref=e114]
+              - img "Gym Leaders & Elite Four - Pokémon Emerald" [ref=e116]
+          - link "NPCs NPCs - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8329/
+            - generic [ref=e117] [cursor=pointer]:
+              - generic "NPCs" [ref=e118]
+              - img "NPCs - Pokémon Emerald" [ref=e120]
+          - link "Red & Leaf Red & Leaf - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8328/
+            - generic [ref=e121] [cursor=pointer]:
+              - generic "Red & Leaf" [ref=e122]
+              - img "Red & Leaf - Pokémon Emerald" [ref=e124]
+          - link "Steven Steven - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/19779/
+            - generic [ref=e125] [cursor=pointer]:
+              - generic "Steven" [ref=e126]
+              - img "Steven - Pokémon Emerald" [ref=e128]
+          - link "Trainers Trainers - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8330/
+            - generic [ref=e129] [cursor=pointer]:
+              - generic "Trainers" [ref=e130]
+              - img "Trainers - Pokémon Emerald" [ref=e132]
+          - link "Wally Wally - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8327/
+            - generic [ref=e133] [cursor=pointer]:
+              - generic "Wally" [ref=e134]
+              - img "Wally - Pokémon Emerald" [ref=e136]
+        - generic [ref=e138]:
+          - iframe [ref=e139]:
+            - iframe [ref=f191e2]:
+              - generic [active] [ref=f192e1]:
+                - generic [ref=f192e4]:
+                  - insertion [ref=f192e6]:
+                    - iframe [ref=f192e7]:
+                      - iframe [ref=f193e4]:
+                        - link [ref=f202e2] [cursor=pointer]:
+                          - /url: https://www.pathtosuccess.global
+                          - img [ref=f202e3]
+                  - link [ref=f192e8] [cursor=pointer]:
+                    - /url: https://pixel.quantcount.com/r?a=p-9fYuixa7g_Hm2;rand=544506617;labels=_click.creative.iab,_qc.iab.clk.p-v9LjTGD7FHGz2.0.10965327;redirecturl2=http://www.quantcast.com/adchoices
+                    - img [ref=f192e10]
+                - iframe
+                - iframe [ref=f192e12]:
+                  - generic [active]:
+                    - img
+          - link [ref=e141] [cursor=pointer]:
+            - /url: javascript:;
+            - img [ref=e142]
+        - generic [ref=e144] [cursor=pointer]:
+          - generic [ref=e145]: arrow_drop_down
+          - generic [ref=e146]: "[10]"
+          - text: Pokémon
+        - generic [ref=e147]:
+          - link "Mew Mew - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/61802/
+            - generic [ref=e148] [cursor=pointer]:
+              - generic "Mew" [ref=e149]
+              - img "Mew - Pokémon Emerald" [ref=e151]
+          - link "Pokémon (1st Generation, Normal) Pokémon (1st Generation, Normal) - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/21230/
+            - generic [ref=e152] [cursor=pointer]:
+              - generic "Pokémon (1st Generation, Normal)" [ref=e153]
+              - img "Pokémon (1st Generation, Normal) - Pokémon Emerald" [ref=e155]
+          - link "Pokémon (1st Generation, Shiny) Pokémon (1st Generation, Shiny) - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/21231/
+            - generic [ref=e156] [cursor=pointer]:
+              - generic "Pokémon (1st Generation, Shiny)" [ref=e157]
+              - img "Pokémon (1st Generation, Shiny) - Pokémon Emerald" [ref=e159]
+          - link "Pokémon (2nd Generation, Normal) Pokémon (2nd Generation, Normal) - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/21229/
+            - generic [ref=e160] [cursor=pointer]:
+              - generic "Pokémon (2nd Generation, Normal)" [ref=e161]
+              - img "Pokémon (2nd Generation, Normal) - Pokémon Emerald" [ref=e163]
+          - link "Pokémon (2nd Generation, Shiny) Pokémon (2nd Generation, Shiny) - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/21301/
+            - generic [ref=e164] [cursor=pointer]:
+              - generic "Pokémon (2nd Generation, Shiny)" [ref=e165]
+              - img "Pokémon (2nd Generation, Shiny) - Pokémon Emerald" [ref=e167]
+          - link "Pokémon (3rd Generation, Normal) Pokémon (3rd Generation, Normal) - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/21228/
+            - generic [ref=e168] [cursor=pointer]:
+              - generic "Pokémon (3rd Generation, Normal)" [ref=e169]
+              - img "Pokémon (3rd Generation, Normal) - Pokémon Emerald" [ref=e171]
+          - link "Pokémon (3rd Generation, Shiny) Pokémon (3rd Generation, Shiny) - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/21650/
+            - generic [ref=e172] [cursor=pointer]:
+              - generic "Pokémon (3rd Generation, Shiny)" [ref=e173]
+              - img "Pokémon (3rd Generation, Shiny) - Pokémon Emerald" [ref=e175]
+          - link "Rayquaza Rayquaza - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8339/
+            - generic [ref=e176] [cursor=pointer]:
+              - generic "Rayquaza" [ref=e177]
+              - img "Rayquaza - Pokémon Emerald" [ref=e179]
+          - link "Spinda Spinda - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/21883/
+            - generic [ref=e180] [cursor=pointer]:
+              - generic "Spinda" [ref=e181]
+              - img "Spinda - Pokémon Emerald" [ref=e183]
+          - link "Vigoroth Vigoroth - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8337/
+            - generic [ref=e184] [cursor=pointer]:
+              - generic "Vigoroth" [ref=e185]
+              - img "Vigoroth - Pokémon Emerald" [ref=e187]
+        - generic [ref=e188] [cursor=pointer]:
+          - generic [ref=e189]: arrow_drop_down
+          - generic [ref=e190]: "[19]"
+          - text: Locations
+        - generic [ref=e191]:
+          - link "Abandoned Ship Abandoned Ship - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/19774/
+            - generic [ref=e192] [cursor=pointer]:
+              - generic "Abandoned Ship" [ref=e193]
+              - img "Abandoned Ship - Pokémon Emerald" [ref=e195]
+          - link "Artisan Cave Artisan Cave - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8347/
+            - generic [ref=e196] [cursor=pointer]:
+              - generic "Artisan Cave" [ref=e197]
+              - img "Artisan Cave - Pokémon Emerald" [ref=e199]
+          - link "Battle Frontier Battle Frontier - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8345/
+            - generic [ref=e200] [cursor=pointer]:
+              - generic "Battle Frontier" [ref=e201]
+              - img "Battle Frontier - Pokémon Emerald" [ref=e203]
+          - link "Battle Frontier Buildings Battle Frontier Buildings - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8346/
+            - generic [ref=e204] [cursor=pointer]:
+              - generic "Battle Frontier Buildings" [ref=e205]
+              - img "Battle Frontier Buildings - Pokémon Emerald" [ref=e207]
+          - link "Battle Frontier Interiors Battle Frontier Interiors - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/18613/
+            - generic [ref=e208] [cursor=pointer]:
+              - generic "Battle Frontier Interiors" [ref=e209]
+              - img "Battle Frontier Interiors - Pokémon Emerald" [ref=e211]
+          - link "Desert Underpass Desert Underpass - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/18614/
+            - generic [ref=e212] [cursor=pointer]:
+              - generic "Desert Underpass" [ref=e213]
+              - img "Desert Underpass - Pokémon Emerald" [ref=e215]
+          - link "Faraway Island Faraway Island - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8358/
+            - generic [ref=e216] [cursor=pointer]:
+              - generic "Faraway Island" [ref=e217]
+              - img "Faraway Island - Pokémon Emerald" [ref=e219]
+          - link "Interior Areas Interior Areas - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/135310/
+            - generic [ref=e220] [cursor=pointer]:
+              - generic "Interior Areas" [ref=e221]
+              - img "Interior Areas - Pokémon Emerald" [ref=e223]
+          - link "Littleroot Town Littleroot Town - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/19776/
+            - generic [ref=e224] [cursor=pointer]:
+              - generic "Littleroot Town" [ref=e225]
+              - img "Littleroot Town - Pokémon Emerald" [ref=e227]
+          - link "Mt. Chimney Mt. Chimney - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/18615/
+            - generic [ref=e228] [cursor=pointer]:
+              - generic "Mt. Chimney" [ref=e229]
+              - img "Mt. Chimney - Pokémon Emerald" [ref=e231]
+          - link "Petalburg Woods Petalburg Woods - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/19778/
+            - generic [ref=e232] [cursor=pointer]:
+              - generic "Petalburg Woods" [ref=e233]
+              - img "Petalburg Woods - Pokémon Emerald" [ref=e235]
+          - link "Pokémon Centre & Mart Pokémon Centre & Mart - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/38099/
+            - generic [ref=e236] [cursor=pointer]:
+              - generic "Pokémon Centre & Mart" [ref=e237]
+              - img "Pokémon Centre & Mart - Pokémon Emerald" [ref=e239]
+          - link "Rydel's Bike Shop Rydel's Bike Shop - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/60677/
+            - generic [ref=e240] [cursor=pointer]:
+              - generic "Rydel's Bike Shop" [ref=e241]
+              - img "Rydel's Bike Shop - Pokémon Emerald" [ref=e243]
+          - link "Safari Zone Safari Zone - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/18616/
+            - generic [ref=e244] [cursor=pointer]:
+              - generic "Safari Zone" [ref=e245]
+              - img "Safari Zone - Pokémon Emerald" [ref=e247]
+          - link "Sand Tower Sand Tower - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8348/
+            - generic [ref=e248] [cursor=pointer]:
+              - generic "Sand Tower" [ref=e249]
+              - img "Sand Tower - Pokémon Emerald" [ref=e251]
+          - link "Scorched Slab Scorched Slab - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/22837/
+            - generic [ref=e252] [cursor=pointer]:
+              - generic "Scorched Slab" [ref=e253]
+              - img "Scorched Slab - Pokémon Emerald" [ref=e255]
+          - link "Secret Bases Secret Bases - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/32695/
+            - generic [ref=e256] [cursor=pointer]:
+              - generic "Secret Bases" [ref=e257]
+              - img "Secret Bases - Pokémon Emerald" [ref=e259]
+          - link "Terra Cave Terra Cave - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/180892/
+            - generic [ref=e260] [cursor=pointer]:
+              - generic "Terra Cave" [ref=e261]
+              - img "Terra Cave - Pokémon Emerald" [ref=e263]
+          - link "Trainer Hill Trainer Hill - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/60679/
+            - generic [ref=e264] [cursor=pointer]:
+              - generic "Trainer Hill" [ref=e265]
+              - img "Trainer Hill - Pokémon Emerald" [ref=e267]
+        - generic [ref=e268] [cursor=pointer]:
+          - generic [ref=e269]: arrow_drop_down
+          - generic [ref=e270]: "[8]"
+          - text: Gyms
+        - generic [ref=e271]:
+          - link "Dewford Gym Dewford Gym - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/23885/
+            - generic [ref=e272] [cursor=pointer]:
+              - generic "Dewford Gym" [ref=e273]
+              - img "Dewford Gym - Pokémon Emerald" [ref=e275]
+          - link "Fortree Gym Fortree Gym - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/23884/
+            - generic [ref=e276] [cursor=pointer]:
+              - generic "Fortree Gym" [ref=e277]
+              - img "Fortree Gym - Pokémon Emerald" [ref=e279]
+          - link "Lavaridge Gym Lavaridge Gym - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/23883/
+            - generic [ref=e280] [cursor=pointer]:
+              - generic "Lavaridge Gym" [ref=e281]
+              - img "Lavaridge Gym - Pokémon Emerald" [ref=e283]
+          - link "Mauville Gym Mauville Gym - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/23882/
+            - generic [ref=e284] [cursor=pointer]:
+              - generic "Mauville Gym" [ref=e285]
+              - img "Mauville Gym - Pokémon Emerald" [ref=e287]
+          - link "Mossdeep Gym Mossdeep Gym - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/23881/
+            - generic [ref=e288] [cursor=pointer]:
+              - generic "Mossdeep Gym" [ref=e289]
+              - img "Mossdeep Gym - Pokémon Emerald" [ref=e291]
+          - link "Petalburg Gym Petalburg Gym - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/23880/
+            - generic [ref=e292] [cursor=pointer]:
+              - generic "Petalburg Gym" [ref=e293]
+              - img "Petalburg Gym - Pokémon Emerald" [ref=e295]
+          - link "Rustboro Gym Rustboro Gym - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/23879/
+            - generic [ref=e296] [cursor=pointer]:
+              - generic "Rustboro Gym" [ref=e297]
+              - img "Rustboro Gym - Pokémon Emerald" [ref=e299]
+          - link "Sootopolis Gym Sootopolis Gym - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/23878/
+            - generic [ref=e300] [cursor=pointer]:
+              - generic "Sootopolis Gym" [ref=e301]
+              - img "Sootopolis Gym - Pokémon Emerald" [ref=e303]
+        - generic [ref=e304] [cursor=pointer]:
+          - generic [ref=e305]: arrow_drop_down
+          - generic [ref=e306]: "[24]"
+          - text: Miscellaneous
+        - generic [ref=e307]:
+          - link "Bag Bag - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8365/
+            - generic [ref=e308] [cursor=pointer]:
+              - generic "Bag" [ref=e309]
+              - generic [ref=e310]:
+                - img "Bag - Pokémon Emerald"
+          - link "Battle Introductions Battle Introductions - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/134267/
+            - generic [ref=e311] [cursor=pointer]:
+              - generic "Battle Introductions" [ref=e312]
+              - generic [ref=e313]:
+                - img "Battle Introductions - Pokémon Emerald"
+          - link "Box System Box System - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/19775/
+            - generic [ref=e314] [cursor=pointer]:
+              - generic "Box System" [ref=e315]
+              - generic [ref=e316]:
+                - img "Box System - Pokémon Emerald"
+          - link "Contests Contests - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/502705/
+            - generic [ref=e317] [cursor=pointer]:
+              - generic "Contests" [ref=e318]
+              - generic [ref=e319]:
+                - img "Contests - Pokémon Emerald"
+          - link "Dodrio Berry Picking Dodrio Berry Picking - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/51435/
+            - generic [ref=e320] [cursor=pointer]:
+              - generic "Dodrio Berry Picking" [ref=e321]
+              - generic [ref=e322]:
+                - img "Dodrio Berry Picking - Pokémon Emerald"
+          - link "Exterior Tileset Exterior Tileset - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/61816/
+            - generic [ref=e323] [cursor=pointer]:
+              - generic "Exterior Tileset" [ref=e324]
+              - generic [ref=e325]:
+                - img "Exterior Tileset - Pokémon Emerald"
+          - link "Font Font - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8368/
+            - generic [ref=e326] [cursor=pointer]:
+              - generic "Font" [ref=e327]
+              - generic [ref=e328]:
+                - img "Font - Pokémon Emerald"
+          - link "Hoenn Map UI Hoenn Map UI - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/116724/
+            - generic [ref=e329] [cursor=pointer]:
+              - generic "Hoenn Map UI" [ref=e330]
+              - generic [ref=e331]:
+                - img "Hoenn Map UI - Pokémon Emerald"
+          - link "Interface Interface - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8367/
+            - generic [ref=e332] [cursor=pointer]:
+              - generic "Interface" [ref=e333]
+              - generic [ref=e334]:
+                - img "Interface - Pokémon Emerald"
+          - link "Interior Tilesets Interior Tilesets - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/83233/
+            - generic [ref=e335] [cursor=pointer]:
+              - generic "Interior Tilesets" [ref=e336]
+              - generic [ref=e337]:
+                - img "Interior Tilesets - Pokémon Emerald"
+          - link "Intro Intro - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8364/
+            - generic [ref=e338] [cursor=pointer]:
+              - generic "Intro" [ref=e339]
+              - generic [ref=e340]:
+                - img "Intro - Pokémon Emerald"
+          - link "Item Icons Item Icons - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/26917/
+            - generic [ref=e341] [cursor=pointer]:
+              - generic "Item Icons" [ref=e342]
+              - generic [ref=e343]:
+                - img "Item Icons - Pokémon Emerald"
+          - link "Mail Mail - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/223536/
+            - generic [ref=e344] [cursor=pointer]:
+              - generic "Mail" [ref=e345]
+              - generic [ref=e346]:
+                - img "Mail - Pokémon Emerald"
+          - link "Map Objects Map Objects - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8362/
+            - generic [ref=e347] [cursor=pointer]:
+              - generic "Map Objects" [ref=e348]
+              - generic [ref=e349]:
+                - img "Map Objects - Pokémon Emerald"
+          - link "Move Effects Move Effects - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/28882/
+            - generic [ref=e350] [cursor=pointer]:
+              - generic "Move Effects" [ref=e351]
+              - generic [ref=e352]:
+                - img "Move Effects - Pokémon Emerald"
+          - link "Moving Truck Moving Truck - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/19777/
+            - generic [ref=e353] [cursor=pointer]:
+              - generic "Moving Truck" [ref=e354]
+              - generic [ref=e355]:
+                - img "Moving Truck - Pokémon Emerald"
+          - link "Poké Balls Poké Balls - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/20106/
+            - generic [ref=e356] [cursor=pointer]:
+              - generic "Poké Balls" [ref=e357]
+              - generic [ref=e358]:
+                - img "Poké Balls - Pokémon Emerald"
+          - link "Pokédex Pokédex - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8369/
+            - generic [ref=e359] [cursor=pointer]:
+              - generic "Pokédex" [ref=e360]
+              - generic [ref=e361]:
+                - img "Pokédex - Pokémon Emerald"
+          - link "Pokémon Menu Pokémon Menu - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/26964/
+            - generic [ref=e362] [cursor=pointer]:
+              - generic "Pokémon Menu" [ref=e363]
+              - generic [ref=e364]:
+                - img "Pokémon Menu - Pokémon Emerald"
+          - link "Route Icons Route Icons - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/8342/
+            - generic [ref=e365] [cursor=pointer]:
+              - generic "Route Icons" [ref=e366]
+              - generic [ref=e367]:
+                - img "Route Icons - Pokémon Emerald"
+          - link "Slots Minigame Slots Minigame - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/171528/
+            - generic [ref=e368] [cursor=pointer]:
+              - generic "Slots Minigame" [ref=e369]
+              - generic [ref=e370]:
+                - img "Slots Minigame - Pokémon Emerald"
+          - link "Stat Effects Stat Effects - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/19782/
+            - generic [ref=e371] [cursor=pointer]:
+              - generic "Stat Effects" [ref=e372]
+              - generic [ref=e373]:
+                - img "Stat Effects - Pokémon Emerald"
+          - link "Steam Effects Steam Effects - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/155605/
+            - generic [ref=e374] [cursor=pointer]:
+              - generic "Steam Effects" [ref=e375]
+              - generic [ref=e376]:
+                - img "Steam Effects - Pokémon Emerald"
+          - link "Type / Condition Icons Type / Condition Icons - Pokémon Emerald":
+            - /url: /game_boy_advance/pokemonemerald/asset/64359/
+            - generic [ref=e377] [cursor=pointer]:
+              - generic "Type / Condition Icons" [ref=e378]
+              - generic [ref=e379]:
+                - img "Type / Condition Icons - Pokémon Emerald"
+        - link "Similar Games" [ref=e383] [cursor=pointer]:
+          - /url: /browse/games/?name=Pokemon+Emerald&sortby=0&dir=2
+      - generic [ref=e384]:
+        - heading "Comments (11)" [level=1] [ref=e385]
+        - separator [ref=e386]
+        - generic [ref=e387]:
+          - text: You must be
+          - link "logged in" [ref=e388] [cursor=pointer]:
+            - /url: /user_login/?return=game_boy_advance%2Fpokemonemerald
+          - text: to post comments.
+        - generic [ref=e389]:
+          - img "Avatar" [ref=e391]
+          - generic [ref=e392]:
+            - generic [ref=e393]:
+              - generic [ref=e394]:
+                - text: Reply to
+                - link "comment" [ref=e395] [cursor=pointer]:
+                  - /url: "#comment_290182"
+                - text: by
+                - link "RenirambusAFoMos" [ref=e396] [cursor=pointer]:
+                  - /url: /profile/renirambusafomos/
+                - text: posted
+                - link "Feb 25, 2026 10:57 AM" [ref=e397] [cursor=pointer]:
+                  - /url: "#comment_290182"
+              - text: the people just too lazy to rip the backs
+            - generic [ref=e398]:
+              - link "victimless chad" [ref=e399] [cursor=pointer]:
+                - /url: /profile/victimless+chad/
+              - generic [ref=e400]: Apr 1, 2026 4:02 PM
+        - generic [ref=e401]:
+          - img "Avatar" [ref=e403]
+          - generic [ref=e404]:
+            - generic [ref=e405]:
+              - generic [ref=e406]:
+                - text: Reply to
+                - link "comment" [ref=e407] [cursor=pointer]:
+                  - /url: "#comment_159518"
+                - text: by
+                - link "victimless chad" [ref=e408] [cursor=pointer]:
+                  - /url: /profile/victimless+chad/
+                - text: posted
+                - link "Aug 11, 2025 12:19 AM" [ref=e409] [cursor=pointer]:
+                  - /url: "#comment_159518"
+              - text: I wanna know too. I mean, Blastoise has a different backsprite in Emerald compared to Ruby/Sapphire and FRLG
+            - generic [ref=e410]:
+              - link "RenirambusAFoMos" [ref=e411] [cursor=pointer]:
+                - /url: /profile/renirambusafomos/
+              - generic [ref=e412]: Feb 25, 2026 10:57 AM
+        - generic [ref=e413]:
+          - img "Avatar" [ref=e415]
+          - generic [ref=e416]:
+            - generic [ref=e417]: I am trying to find the the strength boulders and dust when pushed.
+            - generic [ref=e418]:
+              - link "Donglo" [ref=e419] [cursor=pointer]:
+                - /url: /profile/donglo/
+              - generic [ref=e420]: Jan 11, 2026 12:10 PM
+        - generic [ref=e421]:
+          - img "Avatar" [ref=e423]
+          - generic [ref=e424]:
+            - generic [ref=e425]: where are the back sprites for the pokemon
+            - generic [ref=e426]:
+              - link "victimless chad" [ref=e427] [cursor=pointer]:
+                - /url: /profile/victimless+chad/
+              - generic [ref=e428]: Aug 11, 2025 12:19 AM
+        - generic [ref=e429]:
+          - img "Avatar" [ref=e431]
+          - generic [ref=e432]:
+            - generic [ref=e433]: "\"Can ANY of you adults do ANYTHING right?! Hello, Earth to Archie's brain?!\" ... \"It's HOLLOW!!!\""
+            - generic [ref=e434]:
+              - link "Its-A-Me_Austin" [ref=e435] [cursor=pointer]:
+                - /url: /profile/its-a-me_austin/
+              - 'generic "Last edited: Jan 10, 2025 11:55 PM by Its-A-Me_Austin" [ref=e436]': Jan 10, 2025 3:16 AM *
+        - generic [ref=e437]:
+          - img "Avatar" [ref=e439]
+          - generic [ref=e440]:
+            - generic [ref=e441]: no secret base cushions? also most of the objects on the r/s sheet are missing here.
+            - generic [ref=e442]:
+              - link "maxwell404" [ref=e443] [cursor=pointer]:
+                - /url: /profile/maxwell404/
+              - generic [ref=e444]: Jul 27, 2024 4:23 AM
+        - generic [ref=e445]:
+          - img "Avatar" [ref=e447]
+          - generic [ref=e448]:
+            - generic [ref=e449]: Anyone know where the effects that play before the battle screen show up are? Stuff like the screen shimmering or displaying Pokeballs, Evil Team Logos, etc
+            - generic [ref=e450]:
+              - link "GeckoKorota" [ref=e451] [cursor=pointer]:
+                - /url: /profile/geckokorota/
+              - generic [ref=e452]: Jan 26, 2023 12:16 AM
+        - generic [ref=e453]:
+          - img "Avatar" [ref=e455]
+          - generic [ref=e456]:
+            - generic [ref=e457]: The Japanese and the other languages stuff such as Type / Condition Icons, Pokemon Menu and more seems missing. Also Japanese exclusive Pokemon Box wallpapers are missing too in Box System.
+            - generic [ref=e458]:
+              - link "Boomerwrong" [ref=e459] [cursor=pointer]:
+                - /url: /profile/boomerwrong/
+              - generic [ref=e460]: Jul 1, 2022 12:33 AM
+        - generic [ref=e461]:
+          - img "Avatar" [ref=e463]
+          - generic [ref=e464]:
+            - generic [ref=e465]:
+              - text: They are really here.
+              - link "https://www.spriters-resource.com/game_boy_advance/pokemonrubysapphire/sheet/152950/" [ref=e466] [cursor=pointer]:
+                - /url: https://www.spriters-resource.com/game_boy_advance/pokemonrubysapphire/sheet/152950/
+            - generic [ref=e467]:
+              - 'link "Youngster Donald #263" [ref=e468] [cursor=pointer]':
+                - /url: /profile/youngster+donald+%23263/
+              - generic [ref=e469]: Jan 9, 2022 1:21 PM
+        - generic [ref=e470]:
+          - img "Avatar" [ref=e472]
+          - generic [ref=e473]:
+            - generic [ref=e474]:
+              - text: All the berry bushes are in the Pokemon Ruby
+              - text: and Sapphire section.
+            - generic [ref=e475]:
+              - 'link "Youngster Donald #263" [ref=e476] [cursor=pointer]':
+                - /url: /profile/youngster+donald+%23263/
+              - generic [ref=e477]: Jan 9, 2022 1:19 PM
+        - generic [ref=e478]:
+          - img "Avatar" [ref=e480]
+          - generic [ref=e481]:
+            - generic [ref=e482]: where are my berry bushes?
+            - generic [ref=e483]:
+              - link "TheGameyFireBro105" [ref=e484] [cursor=pointer]:
+                - /url: /profile/thegameyfirebro105/
+              - generic [ref=e485]: May 15, 2020 6:31 PM
+    - generic [ref=e488]:
+      - generic [ref=e489]:
+        - text: ©
+        - link "The Spriters Resource" [ref=e490] [cursor=pointer]:
+          - /url: https://www.spriters-resource.com/
+        - text: 2003-2026
+      - generic [ref=e491]:
+        - text: "Theme: Light |"
+        - link "Dark" [ref=e492] [cursor=pointer]:
+          - /url: /process/settheme/?theme=dark&return=%2Fgame_boy_advance%2Fpokemonemerald%2F
+        - text: "|"
+        - link "Classic" [ref=e493] [cursor=pointer]:
+          - /url: /process/settheme/?theme=classic&return=%2Fgame_boy_advance%2Fpokemonemerald%2F
+      - generic [ref=e494]:
+        - link "Contact" [ref=e495] [cursor=pointer]:
+          - /url: /contact/
+        - text: "|"
+        - link "About" [ref=e496] [cursor=pointer]:
+          - /url: /page/about/
+        - text: "|"
+        - link "Stats" [ref=e497] [cursor=pointer]:
+          - /url: /stats/
+        - text: "|"
+        - link "Privacy" [ref=e498] [cursor=pointer]:
+          - /url: /page/privacy/
+        - text: "|"
+        - link "Terms" [ref=e499] [cursor=pointer]:
+          - /url: /page/tou/
+        - text: "|"
+        - link "Rules" [ref=e500] [cursor=pointer]:
+          - /url: /page/rules/
+        - text: "|"
+        - link "Staff" [ref=e501] [cursor=pointer]:
+          - /url: /user_staff/
+  - generic [ref=e502]:
+    - iframe [ref=e503]:
+      - iframe [ref=f188e2]:
+        - generic [active] [ref=f190e1]:
+          - link [ref=f190e2] [cursor=pointer]:
+            - /url: https://lax1-ib.adnxs.com/click2?e=wqT_3QKiAfCBogAAAAMAxBkFAQjA_brRBhDSu53I6aOUgiIY2Muzlv3DlahnIIHMhREo8zwwpgY4AkCl6876AUja801QAFoDVVNEYgNVU0RowAJwMniQnmaAAYqHBogBAZABApgBBaABAqkB5SfVPh2POT-xASpaFNEKZzI_uQEAAAAAAADgP8EBKg0UEMkB5ifVBSg42AH-4QHgAQDwAfgB-AEA/s=9c68beda66a29b0b64b0c6b228a5b04787ed305c/bcr=AAAAAAAA8D8=/cnd=%21ohKPPQiClY4dEKXrzvoBGNrzTSAAKAAxAAAAAAAA8D86CUxBWDE6NjU1NUCrTEkAAAAAAL-XQFEAAAAAAAAAAFkAAAAAAAAAAGEAAAAAAAAAAGkAAAAAAAAAAHEAAAAAAAAAAHgAiQEAAAAAAADwPw../cca=ODA2I0xBWDE6NjU1NQ==/bn=99210/clickenc=https%3A%2F%2Fwww.playstationtrophies.org%2Fpage%2Fplaystation-trophy-tracking
+            - img [ref=f190e3]
+          - iframe [ref=f190e4]:
+            
+          - img [ref=f190e5]
+          - img
+    - link [ref=e505] [cursor=pointer]:
+      - /url: javascript:;
+      - img [ref=e506]
+    - img [ref=e509] [cursor=pointer]

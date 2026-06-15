@@ -7,12 +7,12 @@ from model.config import TrainConfig
 from model.train import run as train_run
 from model.calibrate import run as calib_run
 from model.infer import load_model, load_calibration
-from model import score_image_app as app
+from gimmicks import score_image_app as app
 
 
 def test_module_imports_without_tk():
     import importlib
-    m = importlib.import_module("model.score_image_app")
+    m = importlib.import_module("gimmicks.score_image_app")
     for fn in ("score_file", "build_result_image", "find_models", "find_checkpoints",
                "list_images", "_parse_drop", "main"):
         assert hasattr(m, fn)

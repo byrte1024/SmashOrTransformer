@@ -1,0 +1,7 @@
+numpy>=1.26
+pillow>=10.0
+timm>=1.0
+scipy>=1.11
+tqdm>=4.66
+requests>=2.31
+pygame>=2.5
