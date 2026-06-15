@@ -59,6 +59,18 @@ def load_records(images_dir, pokemon_id: int,
                 category=row["category"], gen=gen_of(name),
                 path=folder / fname, smash_pct=smash, total_votes=votes,
             ))
+
+    booru_meta = folder / "booru" / "meta.csv"
+    if booru_meta.exists():
+        with open(booru_meta, newline="") as f:
+            for row in csv.DictReader(f):
+                fp = next(iter((folder / "booru").glob(f"*_{row['post_id']}.*")), None)
+                if fp is None or fp.name == "meta.csv":
+                    continue
+                recs.append(ImageRecord(
+                    pokemon_id=pokemon_id, source_name=fp.stem, category="booru",
+                    gen=0, path=fp, smash_pct=smash, total_votes=votes,
+                ))
     return recs
 
 
@@ -73,6 +85,8 @@ def relax_priority(rec: "ImageRecord") -> tuple[int, int]:
 
 def _passes(rec: "ImageRecord", cfg: DataConfig) -> bool:
     s = cfg.selection
+    if rec.category == "booru":
+        return "booru" in s.categories          # opt-in only, even when categories is empty
     if s.categories and rec.category not in s.categories:
         return False
     if s.names.include and rec.source_name not in s.names.include:
@@ -90,7 +104,7 @@ def _passes(rec: "ImageRecord", cfg: DataConfig) -> bool:
 def select_pokemon(cfg: DataConfig,
                    records: list["ImageRecord"]) -> tuple[list["ImageRecord"], dict]:
     kept = [r for r in records if _passes(r, cfg)]
-    excluded = [r for r in records if r not in kept]
+    excluded = [r for r in records if r not in kept and r.category != "booru"]
     n_filtered = len(kept)
     n_relaxed = 0
     if len(kept) < cfg.minimages and excluded:

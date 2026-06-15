@@ -100,11 +100,10 @@ def test_load_records_skips_svg(tmp_path):
     assert "dream_world" not in names
 
 
-def test_booru_subfolder_images_are_excluded(mini_repo, tmp_path):
-    # simulate the booru scraper output: images/1/booru/*.jpg + its own meta.csv
+def _add_booru(images_dir, pid):
     import csv as _csv
     from PIL import Image as _Image
-    booru = mini_repo["images"] / "1" / "booru"
+    booru = images_dir / str(pid) / "booru"
     booru.mkdir()
     _Image.new("RGB", (8, 8), (1, 2, 3)).save(booru / "00_999.jpg")
     with open(booru / "meta.csv", "w", newline="") as f:
@@ -112,11 +111,40 @@ def test_booru_subfolder_images_are_excluded(mini_repo, tmp_path):
         w.writeheader(); w.writerow({"rank": 0, "post_id": 999, "score": 9,
                                      "rating": "safe", "file_url": "http://x/00_999.jpg"})
 
+
+def test_load_records_includes_booru_tagged(mini_repo):
+    _add_booru(mini_repo["images"], 1)
     recs = load_records(mini_repo["images"], 1, load_labels(mini_repo["labels"]))
-    names = {r.source_name for r in recs}
-    # only the top-level sprites are seen; nothing from the booru/ subfolder
-    assert names == {"official-artwork", "home", "gen1_red-blue",
-                     "gen9_scarlet-violet", "showdown"}
-    # no record comes from the booru/ subfolder
-    assert all(r.path.parent.name != "booru" for r in recs)
-    assert "00_999" not in names
+    booru = [r for r in recs if r.category == "booru"]
+    assert len(booru) == 1 and booru[0].source_name == "00_999"
+    assert booru[0].path.parent.name == "booru"
+
+
+def test_booru_excluded_by_default_included_on_opt_in(mini_repo):
+    _add_booru(mini_repo["images"], 1)
+    recs = load_records(mini_repo["images"], 1, load_labels(mini_repo["labels"]))
+    # default (categories empty = all sprite categories) -> no booru
+    default_cfg = DataConfig.from_dict({"name": "d", "resolution": 16})
+    kept, _ = select_pokemon(default_cfg, recs)
+    assert all(r.category != "booru" for r in kept)
+    # sprite-only config -> no booru
+    sprite_cfg = DataConfig.from_dict({"name": "d", "resolution": 16,
+                                       "selection": {"categories": ["portrait"]}})
+    kept, _ = select_pokemon(sprite_cfg, recs)
+    assert all(r.category != "booru" for r in kept)
+    # opt-in -> booru present
+    booru_cfg = DataConfig.from_dict({"name": "d", "resolution": 16,
+                                      "selection": {"categories": ["booru"]}})
+    kept, _ = select_pokemon(booru_cfg, recs)
+    assert [r.category for r in kept] == ["booru"]
+
+
+def test_relaxation_never_adds_booru(mini_repo):
+    _add_booru(mini_repo["images"], 1)
+    recs = load_records(mini_repo["images"], 1, load_labels(mini_repo["labels"]))
+    # impossible minimages with a name filter that matches nothing; relaxation
+    # may re-add sprites but must never pull in the booru record
+    cfg = DataConfig.from_dict({"name": "d", "resolution": 16, "minimages": 99,
+                                "selection": {"names": {"include": ["nope"]}}})
+    kept, _ = select_pokemon(cfg, recs)
+    assert all(r.category != "booru" for r in kept)
