@@ -256,3 +256,42 @@ class DoodlGuidance(GuidanceStrategy):
             opt.step()
         with torch.no_grad():
             return to_pil(_decode01(pipe, self._sample(pipe, emb, z0.detach(), dtype, dev)))
+
+
+class SdsGuidance(GuidanceStrategy):
+    """Score-distillation: optimize a latent with the SD prior's SDS gradient plus
+    the smash-loss gradient (DreamFusion-style, in latent space)."""
+    def __init__(self, steps, guidance_scale, sd_guidance_scale, sds_weight=1.0):
+        self.iters, self.guidance_scale, self.sd = steps, guidance_scale, sd_guidance_scale
+        self.sds_weight = sds_weight
+
+    def generate(self, pipe, smash_model, prompt, target, seed, mean, std):
+        dev = pipe.device
+        dtype = next(pipe.unet.parameters()).dtype
+        emb = _embed(pipe, prompt)
+        res = _smash_res(smash_model)
+        n_train = pipe.scheduler.config.num_train_timesteps
+        gen = torch.Generator(device="cpu").manual_seed(seed)
+        latents = (torch.randn(1, 4, 64, 64, generator=gen).to(dev, dtype)
+                   * pipe.scheduler.init_noise_sigma).detach().requires_grad_(True)
+        opt = torch.optim.Adam([latents], lr=0.05)
+        for i in range(self.iters):
+            opt.zero_grad()
+            # --- SDS gradient (no grad through UNet) ---
+            with torch.no_grad():
+                tg = torch.randint(20, n_train - 20, (1,), generator=gen).item()
+                a = pipe.scheduler.alphas_cumprod[tg].to(dev, dtype)
+                noise = torch.randn(latents.shape, generator=gen).to(dev, dtype)
+                noisy = a.sqrt() * latents + (1 - a).sqrt() * noise
+                pred = pipe.unet(torch.cat([noisy] * 2), tg, encoder_hidden_states=emb).sample
+                n_unc, n_cond = pred.chunk(2)
+                pred = n_unc + self.sd * (n_cond - n_unc)
+                sds_grad = self.sds_weight * (1 - a) * (pred - noise)
+            latents.backward(sds_grad, retain_graph=True)
+            # --- smash-score gradient (through VAE) ---
+            img01 = _decode01(pipe, latents)
+            loss = ((_score_tensor(smash_model, img01, mean, std, res) - target) ** 2).mean()
+            (self.guidance_scale * loss).backward()
+            opt.step()
+        with torch.no_grad():
+            return to_pil(_decode01(pipe, latents.detach()))

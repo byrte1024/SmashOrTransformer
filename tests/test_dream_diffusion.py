@@ -152,3 +152,12 @@ def test_doodl_generate_returns_image():
     img = dd.DoodlGuidance(steps=3, guidance_scale=10.0, sd_guidance_scale=7.5).generate(
         pipe, m, "a creature", target=1.0, seed=1, mean=(0.5,) * 3, std=(0.5,) * 3)
     assert isinstance(img, Image.Image) and img.size == (512, 512)
+
+
+# --- Task 5 tests ---
+def test_sds_generate_returns_image():
+    pipe = _FakePipe()
+    m = _tiny_model()
+    img = dd.SdsGuidance(steps=4, guidance_scale=10.0, sd_guidance_scale=7.5).generate(
+        pipe, m, "a creature", target=1.0, seed=2, mean=(0.5,) * 3, std=(0.5,) * 3)
+    assert isinstance(img, Image.Image) and img.size == (512, 512)
