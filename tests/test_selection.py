@@ -98,3 +98,23 @@ def test_load_records_skips_svg(tmp_path):
     names = {r.source_name for r in recs}
     assert "official-artwork" in names
     assert "dream_world" not in names
+
+
+def test_booru_subfolder_images_are_excluded(mini_repo, tmp_path):
+    # simulate the booru scraper output: images/1/booru/*.jpg + its own meta.csv
+    import csv as _csv
+    from PIL import Image as _Image
+    booru = mini_repo["images"] / "1" / "booru"
+    booru.mkdir()
+    _Image.new("RGB", (8, 8), (1, 2, 3)).save(booru / "00_999.jpg")
+    with open(booru / "meta.csv", "w", newline="") as f:
+        w = _csv.DictWriter(f, fieldnames=["rank", "post_id", "score", "rating", "file_url"])
+        w.writeheader(); w.writerow({"rank": 0, "post_id": 999, "score": 9,
+                                     "rating": "safe", "file_url": "http://x/00_999.jpg"})
+
+    recs = load_records(mini_repo["images"], 1, load_labels(mini_repo["labels"]))
+    names = {r.source_name for r in recs}
+    # only the top-level sprites are seen; nothing from the booru/ subfolder
+    assert names == {"official-artwork", "home", "gen1_red-blue",
+                     "gen9_scarlet-violet", "showdown"}
+    assert all("booru" not in str(r.path) and "999" not in r.source_name for r in recs)
