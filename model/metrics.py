@@ -39,9 +39,11 @@ def evaluate(model, loader, device, desc=None) -> dict:
     all_ids, all_pred, all_true = [], [], []
     loss_sum, n = 0.0, 0
     iterator = tqdm(loader, desc=desc, unit="batch") if desc else loader
-    with torch.no_grad():
+    nb = device.type == "cuda"
+    with torch.no_grad(), torch.autocast(device_type=device.type, dtype=torch.bfloat16,
+                                         enabled=nb):
         for t, y, pid in iterator:
-            t = t.to(device); y = y.to(device)
+            t = t.to(device, non_blocking=nb); y = y.to(device, non_blocking=nb)
             logit = model(t)
             loss_sum += float(soft_bce(logit, y)) * len(y)
             n += len(y)

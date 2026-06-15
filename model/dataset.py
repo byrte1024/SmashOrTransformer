@@ -72,7 +72,9 @@ class EvalDataset(Dataset):
         data = np.load(d / "data.npz", allow_pickle=True)
         self._pid = np.asarray(data["pokemon_id"])
         self._smash = np.asarray(data["smash_pct"])
-        self._images = DatasetImages(d, data)          # mmap blob (or legacy npz array)
+        # share the train sampler's capped WEBP cache (built at 1.5x res) if present
+        cache_side = int(np.ceil(resolution * 1.5))
+        self._images = DatasetImages(d, data, cache_side=cache_side)
         self._rows = list(json.loads((d / "split.json").read_text())[split])
         self.mean, self.std, self.resolution = mean, std, resolution
 
@@ -81,6 +83,7 @@ class EvalDataset(Dataset):
 
     def __getitem__(self, i: int):
         r = self._rows[i]
-        img = render_input(self._images[r], self.resolution, stretch=True)
+        # eval renders to exactly `resolution`; decode no larger than that.
+        img = render_input(self._images.get(r, self.resolution), self.resolution, stretch=True)
         t = to_tensor(img, self.mean, self.std)
         return t, torch.tensor(float(self._smash[r]), dtype=torch.float32), int(self._pid[r])

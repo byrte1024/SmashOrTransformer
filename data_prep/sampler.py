@@ -6,7 +6,7 @@ from PIL import Image
 from .config import DataConfig
 from .augmentations import build_sprite_aug, build_photo_aug
 from .sampling import build_sampling
-from .imagestore import DatasetImages
+from .imagestore import DatasetImages, build_decode_cache
 
 
 class DataSampler:
@@ -16,7 +16,8 @@ class DataSampler:
     Framework-agnostic; wrap into a torch Dataset later.
     """
 
-    def __init__(self, dataset_dir, split: str = "train", epoch: int = 0):
+    def __init__(self, dataset_dir, split: str = "train", epoch: int = 0,
+                 use_cache: bool = True):
         self.dir = Path(dataset_dir)
         self.cfg = DataConfig.from_dict(json.loads((self.dir / "config.json").read_text()))
         data = np.load(self.dir / "data.npz", allow_pickle=True)
@@ -26,7 +27,14 @@ class DataSampler:
         # callers (e.g. weighting the loss by vote volume); not used internally.
         self._votes = np.asarray(data["total_votes"])
         self._cat = np.asarray(data["category"])
-        self._images = DatasetImages(self.dir, data)   # mmap blob (or legacy npz array)
+        # Cap decode size: no augmentation upsizes a sprite past ~1.1x the canvas
+        # (Scale) or a photo past ~1.2x (ScaleFit). Decode at 1.5x for headroom
+        # (rotation expand, rounding) -- everything above that is wasted work.
+        self._decode_side = int(np.ceil(self.cfg.resolution * 1.5))
+        if use_cache:                                  # one-time; reused every epoch/run
+            build_decode_cache(self.dir, self._decode_side)
+        self._images = DatasetImages(self.dir, data,
+                                     cache_side=self._decode_side if use_cache else None)
 
         split_info = json.loads((self.dir / "split.json").read_text())
         self._rows = list(split_info[split])
@@ -62,7 +70,7 @@ class DataSampler:
     def __getitem__(self, i: int):
         row = self._plan[i]
         rng = np.random.default_rng([self.cfg.seed, self.epoch, i])
-        sprite = Image.fromarray(self._images[row], "RGBA")
+        sprite = Image.fromarray(self._images.get(row, self._decode_side), "RGBA")
         aug = self._photo_aug if str(self._cat[row]) == "booru" else self._sprite_aug
         img = aug.apply(sprite, rng, self.cfg.resolution)
         return np.asarray(img, dtype=np.uint8), float(self._smash[row])

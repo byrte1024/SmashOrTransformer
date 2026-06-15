@@ -37,13 +37,19 @@ def run(cfg: TrainConfig, pretrained: bool = True) -> Path:
     model.to(device)
     mean, std = model.data_config["mean"], model.data_config["std"]
 
+    pin = device.type == "cuda"
+    nw = cfg.num_workers
+    loader_kw = dict(num_workers=nw, pin_memory=pin)
+    if nw > 0:
+        loader_kw["persistent_workers"] = True         # don't re-spawn workers each epoch
+        loader_kw["prefetch_factor"] = 4               # keep the GPU fed
     train_sampler = DataSampler(cfg.dataset_dir, split="train", epoch=0)
     train_ds = TrainDataset(train_sampler, mean, std)
     train_loader = DataLoader(train_ds, batch_size=cfg.batch_size, shuffle=True,
-                              num_workers=cfg.num_workers, drop_last=False)
+                              drop_last=True, **loader_kw)
     val_ds = EvalDataset(cfg.dataset_dir, "val", mean, std, cfg.resolution)
     val_loader = DataLoader(val_ds, batch_size=cfg.batch_size, shuffle=False,
-                            num_workers=cfg.num_workers)
+                            **loader_kw)
 
     optimizer = AdamW(
         [{"params": model.head.parameters(), "lr": cfg.lr_head},
@@ -78,8 +84,8 @@ def run(cfg: TrainConfig, pretrained: bool = True) -> Path:
         loop = tqdm(train_loader, desc=f"epoch {epoch + 1}/{cfg.epochs} [{phase}]",
                     unit="batch", leave=False)
         for t, y in loop:
-            t = t.to(device); y = y.to(device)
-            optimizer.zero_grad()
+            t = t.to(device, non_blocking=pin); y = y.to(device, non_blocking=pin)
+            optimizer.zero_grad(set_to_none=True)
             with torch.autocast(device_type=device.type, dtype=torch.bfloat16,
                                 enabled=use_amp):
                 logits = model(t)
