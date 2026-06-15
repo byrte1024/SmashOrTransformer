@@ -81,6 +81,21 @@ def test_sampler_routes_booru_through_photo_aug(mini_repo, tmp_path):
     # both categories made it into the dataset
     cats = set(__import__("numpy").load(out / "data.npz", allow_pickle=True)["category"].tolist())
     assert "booru" in cats and "portrait" in cats
-    img, label = ds[0]
-    assert img.shape == (32, 32, 3) and img.dtype.name == "uint8"
-    assert 0.0 <= label <= 1.0
+    import numpy as _np
+    from PIL import Image as _Image
+
+    class _Stub:
+        def __init__(self, val): self.val = val
+        def apply(self, img, rng, res):
+            return _Image.fromarray(_np.full((res, res, 3), self.val, _np.uint8), "RGB")
+
+    ds._sprite_aug = _Stub(10)
+    ds._photo_aug = _Stub(200)
+    seen = set()
+    for i in range(len(ds)):
+        row = ds._plan[i]
+        cat = str(ds._cat[row])
+        img, _ = ds[i]
+        assert img[0, 0, 0] == (200 if cat == "booru" else 10)   # routed to the right pipeline
+        seen.add(cat)
+    assert {"booru", "portrait"} <= seen        # both kinds were actually exercised
