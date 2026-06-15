@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field, asdict
 
-CATEGORIES = ("portrait", "in-game", "animated")
+CATEGORIES = ("portrait", "in-game", "animated", "booru")
 SCALE_METHODS = ("nearest", "bilinear", "bicubic", "lanczos")
 SPLIT_STRATEGIES = ("pokemon", "image")
 
@@ -10,6 +10,11 @@ DEFAULT_SCALE_H = (0.65, 1.10)
 DEFAULT_POS_X = (0.10, 0.90)
 DEFAULT_POS_Y = (0.10, 0.90)
 DEFAULT_ROTATION = (-10.0, 10.0)
+DEFAULT_BG_DIRS = ["backgrounds/real", "backgrounds/pokemon_battle"]
+DEFAULT_BG_PROB = 0.8
+DEFAULT_FLIP = 0.5
+DEFAULT_CROP_SCALE = (0.6, 1.0)
+_FLAT_AUG_KEYS = {"scale", "scale_method", "position", "rotation", "background", "flip"}
 
 
 def _pair(v, default):
@@ -64,16 +69,76 @@ class PositionAugCfg:
 
 @dataclass
 class BackgroundCfg:
-    mode: str = "white"
+    prob: float = DEFAULT_BG_PROB
+    dirs: list[str] = field(default_factory=lambda: list(DEFAULT_BG_DIRS))
+    weights: list[float] | None = None
 
 
 @dataclass
-class AugmentationsCfg:
+class SpriteAugCfg:
     scale: ScaleAugCfg = field(default_factory=ScaleAugCfg)
     scale_method: str = "bilinear"
     position: PositionAugCfg = field(default_factory=PositionAugCfg)
     rotation: tuple[float, float] = DEFAULT_ROTATION
+    flip: float = DEFAULT_FLIP
     background: BackgroundCfg = field(default_factory=BackgroundCfg)
+
+
+@dataclass
+class ColorCfg:
+    brightness: float = 0.2
+    contrast: float = 0.2
+    saturation: float = 0.2
+    hue: float = 0.05
+
+
+@dataclass
+class PhotoAugCfg:
+    crop_scale: tuple[float, float] = DEFAULT_CROP_SCALE
+    color: ColorCfg = field(default_factory=ColorCfg)
+    flip: float = DEFAULT_FLIP
+
+
+@dataclass
+class AugmentationsCfg:
+    sprite: SpriteAugCfg = field(default_factory=SpriteAugCfg)
+    photo: PhotoAugCfg = field(default_factory=PhotoAugCfg)
+
+
+def _parse_sprite(sp: dict) -> SpriteAugCfg:
+    sc = sp.get("scale", {}) or {}
+    po = sp.get("position", {}) or {}
+    bg = sp.get("background", {}) or {}
+    if "prob" in bg:
+        prob = float(bg["prob"])
+    elif bg.get("mode") == "white":           # back-compat: old white stub
+        prob = 0.0
+    else:
+        prob = DEFAULT_BG_PROB
+    return SpriteAugCfg(
+        scale=ScaleAugCfg(w=_pair(sc.get("w"), DEFAULT_SCALE_W),
+                          h=_pair(sc.get("h"), DEFAULT_SCALE_H)),
+        scale_method=sp.get("scale_method", "bilinear"),
+        position=PositionAugCfg(x=_pair(po.get("x"), DEFAULT_POS_X),
+                                y=_pair(po.get("y"), DEFAULT_POS_Y)),
+        rotation=_pair(sp.get("rotation"), DEFAULT_ROTATION),
+        flip=float(sp.get("flip", DEFAULT_FLIP)),
+        background=BackgroundCfg(prob=prob,
+                                dirs=list(bg.get("dirs", DEFAULT_BG_DIRS)),
+                                weights=bg.get("weights")),
+    )
+
+
+def _parse_photo(ph: dict) -> PhotoAugCfg:
+    col = ph.get("color", {}) or {}
+    return PhotoAugCfg(
+        crop_scale=_pair(ph.get("crop_scale"), DEFAULT_CROP_SCALE),
+        color=ColorCfg(brightness=float(col.get("brightness", 0.2)),
+                       contrast=float(col.get("contrast", 0.2)),
+                       saturation=float(col.get("saturation", 0.2)),
+                       hue=float(col.get("hue", 0.05))),
+        flip=float(ph.get("flip", DEFAULT_FLIP)),
+    )
 
 
 @dataclass
@@ -102,14 +167,10 @@ class DataConfig:
 
         var_raw = d.get("variations", 1)
         if isinstance(var_raw, dict):
-            # Handle both user input format {"fill_so": value} and roundtrip format {"mode": "fill_so", ...}
             if "mode" in var_raw:
-                # Roundtrip format from to_dict()
                 variations = VariationsCfg(mode=var_raw.get("mode", "flat"),
-                                           n=var_raw.get("n"),
-                                           target=var_raw.get("target"))
+                                           n=var_raw.get("n"), target=var_raw.get("target"))
             else:
-                # User input format {"fill_so": value}
                 variations = VariationsCfg(mode="fill_so", n=None,
                                            target=var_raw.get("fill_so", None))
         else:
@@ -120,24 +181,16 @@ class DataConfig:
                          val_frac=float(sp.get("val_frac", 0.1)))
 
         au = d.get("augmentations", {}) or {}
-        sc = au.get("scale", {}) or {}
-        po = au.get("position", {}) or {}
-        bg = au.get("background", {}) or {}
-        aug = AugmentationsCfg(
-            scale=ScaleAugCfg(w=_pair(sc.get("w"), DEFAULT_SCALE_W),
-                              h=_pair(sc.get("h"), DEFAULT_SCALE_H)),
-            scale_method=au.get("scale_method", "bilinear"),
-            position=PositionAugCfg(x=_pair(po.get("x"), DEFAULT_POS_X),
-                                    y=_pair(po.get("y"), DEFAULT_POS_Y)),
-            rotation=_pair(au.get("rotation"), DEFAULT_ROTATION),
-            background=BackgroundCfg(mode=bg.get("mode", "white")),
-        )
+        sprite_raw = au.get("sprite")
+        if sprite_raw is None:                    # back-compat: old flat aug == sprite
+            sprite_raw = au if (set(au) & _FLAT_AUG_KEYS) else {}
+        aug = AugmentationsCfg(sprite=_parse_sprite(sprite_raw),
+                               photo=_parse_photo(au.get("photo", {}) or {}))
 
         cfg = DataConfig(
             name=d["name"], resolution=int(d["resolution"]),
             seed=int(d.get("seed", 0)), minimages=int(d.get("minimages", 1)),
-            selection=selection, variations=variations, split=split,
-            augmentations=aug,
+            selection=selection, variations=variations, split=split, augmentations=aug,
         )
         cfg.validate()
         return cfg
@@ -149,8 +202,10 @@ class DataConfig:
             raise ValueError("minimages must be >= 0")
         if self.split.strategy not in SPLIT_STRATEGIES:
             raise ValueError(f"split.strategy must be one of {SPLIT_STRATEGIES}")
-        if self.augmentations.scale_method not in SCALE_METHODS:
+        if self.augmentations.sprite.scale_method not in SCALE_METHODS:
             raise ValueError(f"scale_method must be one of {SCALE_METHODS}")
+        if not (0.0 <= self.augmentations.sprite.background.prob <= 1.0):
+            raise ValueError("background.prob must be in [0,1]")
         for c in self.selection.categories:
             if c not in CATEGORIES:
                 raise ValueError(f"unknown category {c!r}")
