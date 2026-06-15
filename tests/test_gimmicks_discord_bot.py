@@ -162,3 +162,17 @@ def test_get_explanation_caches(tmp_path, monkeypatch):
     assert bot.get_explanation(cache, data, 60, True, "m") == "cached line"  # 2nd from cache
     assert calls["n"] == 1                          # explain invoked once
     assert (tmp_path / "c.json").exists()           # persisted
+
+
+def test_broken_image_raises_and_has_message():
+    import pytest as _pytest
+    # BROKEN is a usable ASCII string
+    assert bot.BROKEN and bot.BROKEN.isascii()
+    # garbage and truncated PNG both raise (so on_message can catch -> BROKEN)
+    with _pytest.raises(Exception):
+        bot._rgba_from_bytes(b"definitely not an image")
+    with _pytest.raises(Exception):
+        bot._rgba_from_bytes(b"\x89PNG\r\n\x1a\n\x00\x00@Sbroken")
+    # rate_bytes propagates the error (model never reached for a broken image)
+    with _pytest.raises(Exception):
+        bot.rate_bytes(None, None, None, b"not an image", device="cpu")

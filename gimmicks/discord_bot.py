@@ -114,6 +114,7 @@ def verdict_text(label, cal_pct, smash) -> str:
 
 HELP = ("ping me with an image, reply to one, say `me` for your own pfp, or "
         "@ someone to rate theirs.")
+BROKEN = "i can't even open that one - it's corrupted or not a real image."
 
 
 # --------------------------------------------------------------------------- #
@@ -293,8 +294,12 @@ def run(checkpoint_path, token_path="gimmicks/secret.txt", device="cuda", thresh
             return
 
         async with message.channel.typing():
-            raw, cal, smash, png = await asyncio.to_thread(
-                rate_bytes, model, cfg, calib, data, dev, threshold)
+            try:
+                raw, cal, smash, png = await asyncio.to_thread(
+                    rate_bytes, model, cfg, calib, data, dev, threshold)
+            except Exception:
+                await message.reply(BROKEN)         # corrupt/truncated/non-image
+                return
             text = verdict_text(label, cal, smash)
             if use_llm:
                 exp = await asyncio.to_thread(get_explanation, cache, data, cal, smash, llm_model)
