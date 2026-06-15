@@ -5,6 +5,7 @@ __pycache__/
 datasets/
 runs/
 results/
+images/
 palworld/
 secret.txt
 gimmicks/secret.txt
