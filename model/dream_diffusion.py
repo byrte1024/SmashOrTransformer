@@ -219,3 +219,40 @@ def _smash_res(smash_model):
     img_size, so we read it from backbone.patch_embed.img_size instead.
     """
     return int(smash_model.backbone.patch_embed.img_size[0])
+
+
+class DoodlGuidance(GuidanceStrategy):
+    """Optimize the initial noise latent so the final decoded image hits the
+    target, backpropagating through a short deterministic DDIM chain."""
+    def __init__(self, steps, guidance_scale, sd_guidance_scale, opt_iters=2, lr=0.1):
+        self.steps, self.sd = steps, sd_guidance_scale
+        self.opt_iters, self.lr = opt_iters, lr
+
+    def _sample(self, pipe, emb, latents, dtype, dev):
+        pipe.scheduler.set_timesteps(self.steps, device=dev)
+        for t in pipe.scheduler.timesteps:
+            lat_in = pipe.scheduler.scale_model_input(torch.cat([latents] * 2), t)
+            noise = pipe.unet(lat_in, t, encoder_hidden_states=emb).sample
+            n_unc, n_cond = noise.chunk(2)
+            noise = n_unc + self.sd * (n_cond - n_unc)
+            latents = pipe.scheduler.step(noise, t, latents).prev_sample
+        return latents
+
+    def generate(self, pipe, smash_model, prompt, target, seed, mean, std):
+        dev = pipe.device
+        dtype = next(pipe.unet.parameters()).dtype
+        emb = _embed(pipe, prompt)
+        res = _smash_res(smash_model)
+        gen = torch.Generator(device="cpu").manual_seed(seed)
+        z0 = torch.randn(1, 4, 64, 64, generator=gen).to(dev, dtype) * pipe.scheduler.init_noise_sigma
+        z0 = z0.detach().requires_grad_(True)
+        opt = torch.optim.Adam([z0], lr=self.lr)
+        for _ in range(self.opt_iters):
+            opt.zero_grad()
+            latents = self._sample(pipe, emb, z0, dtype, dev)
+            img01 = _decode01(pipe, latents)
+            loss = ((_score_tensor(smash_model, img01, mean, std, res) - target) ** 2).mean()
+            loss.backward()
+            opt.step()
+        with torch.no_grad():
+            return to_pil(_decode01(pipe, self._sample(pipe, emb, z0.detach(), dtype, dev)))

@@ -143,3 +143,12 @@ def test_xhat_generate_returns_image_and_uses_model():
         dd._score_tensor = orig
     assert isinstance(img, Image.Image) and img.size == (512, 512)
     assert calls["n"] >= 3            # guidance evaluated the smash model each step
+
+
+# --- Task 4 tests ---
+def test_doodl_generate_returns_image():
+    pipe = _FakePipe()
+    m = _tiny_model()
+    img = dd.DoodlGuidance(steps=3, guidance_scale=10.0, sd_guidance_scale=7.5).generate(
+        pipe, m, "a creature", target=1.0, seed=1, mean=(0.5,) * 3, std=(0.5,) * 3)
+    assert isinstance(img, Image.Image) and img.size == (512, 512)
