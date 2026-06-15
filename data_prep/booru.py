@@ -251,7 +251,7 @@ def delete_booru(images_dir, ids) -> int:
 
 
 def run(names_csv="pokemon_names.csv", images_dir="images", top=10, page_size=100,
-        max_pages=10, min_score=0, ids=None, limit=None, sleep=0.05,
+        max_pages=10, min_score=0, ids=None, limit=None, sleep=0.0,
         sleep_page=0.0, force=False, delete=False, download_workers=16):
     names = load_names(names_csv)
     poke_index = build_poke_index(names)
@@ -296,7 +296,7 @@ def main(argv=None):
     p.add_argument("--min-score", type=int, default=0)
     p.add_argument("--ids", default=None, help="comma-separated dex ids (e.g. 6,282)")
     p.add_argument("--limit", type=int, default=None, help="only the first N pokemon")
-    p.add_argument("--sleep", type=float, default=0.05, help="seconds between pokemon")
+    p.add_argument("--sleep", type=float, default=0.0, help="seconds between pokemon")
     p.add_argument("--sleep-page", type=float, default=0.0, help="seconds between pages")
     p.add_argument("--download-workers", type=int, default=16,
                    help="parallel image downloads per pokemon")
