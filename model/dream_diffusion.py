@@ -164,3 +164,58 @@ def _build_strategies(steps, guidance_scale, sd_guidance_scale):
     return {"xhat": XHatGuidance(steps, guidance_scale, sd_guidance_scale),
             "doodl": DoodlGuidance(steps, guidance_scale, sd_guidance_scale),
             "sds": SdsGuidance(steps, guidance_scale, sd_guidance_scale)}
+
+
+def _embed(pipe, prompt):
+    """Concatenated [uncond, cond] text embeddings for classifier-free guidance."""
+    prompt_embeds, neg_embeds = pipe.encode_prompt(prompt, pipe.device, 1, True, negative_prompt="")
+    return torch.cat([neg_embeds, prompt_embeds]).to(next(pipe.unet.parameters()).dtype)
+
+
+def _decode01(pipe, latents):
+    """VAE-decode latents -> image in [0,1]."""
+    img = pipe.vae.decode(latents / pipe.vae.config.scaling_factor).sample
+    return (img / 2 + 0.5).clamp(0, 1)
+
+
+class XHatGuidance(GuidanceStrategy):
+    """Universal guidance: each DDIM step, nudge the latent by the gradient of the
+    smash loss evaluated on the predicted clean image x0-hat."""
+    def __init__(self, steps, guidance_scale, sd_guidance_scale):
+        self.steps, self.guidance_scale, self.sd = steps, guidance_scale, sd_guidance_scale
+
+    def generate(self, pipe, smash_model, prompt, target, seed, mean, std):
+        dev = pipe.device
+        dtype = next(pipe.unet.parameters()).dtype
+        emb = _embed(pipe, prompt)
+        gen = torch.Generator(device="cpu").manual_seed(seed)
+        latents = torch.randn(1, 4, 64, 64, generator=gen).to(dev, dtype)
+        latents = latents * pipe.scheduler.init_noise_sigma
+        pipe.scheduler.set_timesteps(self.steps, device=dev)
+        res = _smash_res(smash_model)
+        for t in pipe.scheduler.timesteps:
+            latents = latents.detach().requires_grad_(True)
+            lat_in = pipe.scheduler.scale_model_input(torch.cat([latents] * 2), t)
+            noise = pipe.unet(lat_in, t, encoder_hidden_states=emb).sample
+            n_unc, n_cond = noise.chunk(2)
+            noise = n_unc + self.sd * (n_cond - n_unc)
+            a = pipe.scheduler.alphas_cumprod[int(t)].to(dev, dtype)
+            x0 = (latents - (1 - a).sqrt() * noise) / a.sqrt()
+            img01 = _decode01(pipe, x0)
+            loss = ((_score_tensor(smash_model, img01, mean, std, res) - target) ** 2).mean()
+            grad = torch.autograd.grad(loss, latents)[0]
+            with torch.no_grad():
+                latents = pipe.scheduler.step(noise, t, latents).prev_sample
+                latents = latents - self.guidance_scale * grad
+        with torch.no_grad():
+            return to_pil(_decode01(pipe, latents))
+
+
+def _smash_res(smash_model):
+    """Model input resolution from the backbone's actual patch embed size.
+
+    timm's resolve_model_data_config returns the canonical backbone size (e.g.
+    224 for vit_tiny_patch16_224) even when the model was built with a custom
+    img_size, so we read it from backbone.patch_embed.img_size instead.
+    """
+    return int(smash_model.backbone.patch_embed.img_size[0])

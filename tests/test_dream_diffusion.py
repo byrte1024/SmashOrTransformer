@@ -86,3 +86,60 @@ def test_score_pil_in_range(mini_repo, tmp_path):
     raw, cal = dd.score_pil(model, cfg, Image.new("RGB", (40, 40), (200, 100, 50)),
                             calib, device="cpu")
     assert 0 <= raw <= 100 and 0 <= cal <= 100
+
+
+# --- Task 3 tests ---
+import torch.nn as _nn
+from types import SimpleNamespace
+
+
+class _FakeUNet(_nn.Module):
+    def __init__(self): super().__init__(); self.c = _nn.Conv2d(4, 4, 3, padding=1)
+    def forward(self, x, t, encoder_hidden_states=None): return SimpleNamespace(sample=self.c(x))
+    __call__ = forward
+
+
+class _FakeVAE(_nn.Module):
+    def __init__(self):
+        super().__init__(); self.w = _nn.Conv2d(4, 3, 1)
+        self.config = SimpleNamespace(scaling_factor=0.18215)
+    def decode(self, z):
+        img = _nn.functional.interpolate(self.w(z), size=512, mode="nearest")
+        return SimpleNamespace(sample=torch.tanh(img))
+
+
+class _FakeScheduler:
+    def __init__(self, n=1000):
+        self.alphas_cumprod = torch.linspace(0.9999, 0.02, n)
+        self.init_noise_sigma = 1.0
+        self.config = SimpleNamespace(num_train_timesteps=n)
+    def set_timesteps(self, steps, device=None):
+        self.timesteps = torch.linspace(self.config.num_train_timesteps - 1, 0, steps).long()
+    def scale_model_input(self, x, t): return x
+    def step(self, noise, t, latents): return SimpleNamespace(prev_sample=latents - 0.01 * noise)
+
+
+class _FakePipe:
+    def __init__(self):
+        self.unet = _FakeUNet(); self.vae = _FakeVAE(); self.scheduler = _FakeScheduler()
+        self.device = torch.device("cpu")
+    def encode_prompt(self, prompt, device, n, cfg, negative_prompt=""):
+        e = torch.zeros(1, 4, 8)
+        return e, e   # (prompt_embeds, negative_prompt_embeds)
+
+
+def test_xhat_generate_returns_image_and_uses_model():
+    pipe = _FakePipe()
+    m = _tiny_model()
+    calls = {"n": 0}
+    orig = dd._score_tensor
+    def counting(*a, **k):
+        calls["n"] += 1; return orig(*a, **k)
+    dd._score_tensor = counting
+    try:
+        img = dd.XHatGuidance(steps=3, guidance_scale=10.0, sd_guidance_scale=7.5).generate(
+            pipe, m, "a creature", target=1.0, seed=0, mean=(0.5,) * 3, std=(0.5,) * 3)
+    finally:
+        dd._score_tensor = orig
+    assert isinstance(img, Image.Image) and img.size == (512, 512)
+    assert calls["n"] >= 3            # guidance evaluated the smash model each step
