@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import csv
 import re
+import shutil
 import time
 from pathlib import Path
 import requests
@@ -208,9 +209,20 @@ def process_pokemon(session, pid, name, images_dir, poke_index, top, page_size,
     return len(rows)
 
 
+def delete_booru(images_dir, ids) -> int:
+    """Remove the booru/ subfolder for each given Pokemon id. Returns count removed."""
+    removed = 0
+    for pid in ids:
+        d = Path(images_dir) / str(pid) / "booru"
+        if d.exists():
+            shutil.rmtree(d)
+            removed += 1
+    return removed
+
+
 def run(names_csv="pokemon_names.csv", images_dir="images", top=10, page_size=100,
         max_pages=10, min_score=0, ids=None, limit=None, sleep=1.0, sleep_dl=0.25,
-        sleep_page=0.5, force=False):
+        sleep_page=0.5, force=False, delete=False):
     names = load_names(names_csv)
     poke_index = build_poke_index(names)
     if ids:
@@ -218,6 +230,11 @@ def run(names_csv="pokemon_names.csv", images_dir="images", top=10, page_size=10
         names = [(i, n) for i, n in names if i in idset]
     if limit:
         names = names[:limit]
+
+    if delete:
+        removed = delete_booru(images_dir, [pid for pid, _ in names])
+        print(f"removed {removed} previously-fetched booru folder(s)")
+        return
 
     session = requests.Session()
     got, skipped, empty = 0, 0, 0
@@ -252,12 +269,15 @@ def main(argv=None):
     p.add_argument("--sleep-dl", type=float, default=0.25, help="seconds between downloads")
     p.add_argument("--sleep-page", type=float, default=0.5, help="seconds between pages")
     p.add_argument("--force", action="store_true", help="re-download even if present")
+    p.add_argument("--del", dest="delete", action="store_true",
+                   help="remove all previously fetched booru/ folders and exit "
+                        "(respects --ids/--limit; deletes all if neither given)")
     args = p.parse_args(argv)
     ids = [int(x) for x in args.ids.split(",")] if args.ids else None
     run(names_csv=args.names, images_dir=args.images, top=args.top,
         page_size=args.page_size, max_pages=args.max_pages, min_score=args.min_score,
         ids=ids, limit=args.limit, sleep=args.sleep, sleep_dl=args.sleep_dl,
-        sleep_page=args.sleep_page, force=args.force)
+        sleep_page=args.sleep_page, force=args.force, delete=args.delete)
 
 
 if __name__ == "__main__":

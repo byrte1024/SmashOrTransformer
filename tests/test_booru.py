@@ -124,3 +124,18 @@ def test_is_human_covers_count_and_humanoid_variants():
     assert not is_human({"charizard", "fire", "flying", "solo"})   # solo pokemon kept
     assert not is_human({"gardevoir", "green_hair", "red_eyes"})   # humanoid POKEMON kept
     assert not is_human({"charizard", "furry", "anthro"})          # anthro art kept now
+
+
+def test_delete_booru_removes_only_selected(tmp_path):
+    from data_prep.booru import delete_booru
+    for pid in (1, 2):
+        d = tmp_path / str(pid) / "booru"
+        d.mkdir(parents=True)
+        (d / "00_1.jpg").write_bytes(b"x")
+    # delete only pokemon 1's booru folder
+    assert delete_booru(str(tmp_path), [1]) == 1
+    assert not (tmp_path / "1" / "booru").exists()
+    assert (tmp_path / "2" / "booru").exists()        # untouched
+    assert (tmp_path / "1").exists()                  # only booru/ removed, sprites kept
+    # deleting again is a no-op (folder already gone)
+    assert delete_booru(str(tmp_path), [1]) == 0
