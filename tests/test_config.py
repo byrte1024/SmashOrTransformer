@@ -14,9 +14,12 @@ def test_defaults():
     assert s.background.prob == 0.8
     assert s.background.dirs == ["backgrounds/real", "backgrounds/pokemon_battle"]
     p = cfg.augmentations.photo
-    assert p.crop_scale == (0.6, 1.0)
-    assert p.color.brightness == 0.2 and p.color.hue == 0.05
+    assert p.scale == (0.9, 1.2)
+    assert p.position.x == (0.4, 0.6)
+    assert p.color.contrast == 0.3 and p.color.hue == 0.1
     assert p.flip == 0.5
+    assert p.background.white and p.background.black
+    assert p.background.dirs == ["backgrounds/real", "backgrounds/pokemon_battle"]
 
 
 def test_variations_flat():
@@ -89,14 +92,18 @@ def test_nested_aug_parsed():
     cfg = DataConfig.from_dict({"name": "d", "resolution": 64, "augmentations": {
         "sprite": {"rotation": [-5, 5], "flip": 0.0,
                    "background": {"prob": 0.5, "dirs": ["backgrounds/real"]}},
-        "photo": {"crop_scale": [0.4, 0.9], "flip": 1.0,
+        "photo": {"scale": [0.8, 1.3], "position": {"x": [0.3, 0.7], "y": [0.3, 0.7]},
+                  "flip": 1.0, "background": {"white": False, "black": True, "dirs": []},
                   "color": {"brightness": 0.1, "contrast": 0.1, "saturation": 0.1, "hue": 0.0}}}})
     assert cfg.augmentations.sprite.rotation == (-5.0, 5.0)
     assert cfg.augmentations.sprite.flip == 0.0
     assert cfg.augmentations.sprite.background.prob == 0.5
     assert cfg.augmentations.sprite.background.dirs == ["backgrounds/real"]
-    assert cfg.augmentations.photo.crop_scale == (0.4, 0.9)
+    assert cfg.augmentations.photo.scale == (0.8, 1.3)
+    assert cfg.augmentations.photo.position.x == (0.3, 0.7)
     assert cfg.augmentations.photo.flip == 1.0
+    assert cfg.augmentations.photo.background.white is False
+    assert cfg.augmentations.photo.background.black is True
 
 
 def test_back_compat_flat_aug_is_sprite():
@@ -116,10 +123,10 @@ def test_booru_is_a_valid_category():
     assert cfg.selection.categories == ["booru"]
 
 
-def test_validate_rejects_bad_crop_scale():
+def test_validate_rejects_bad_photo_scale():
     with pytest.raises(ValueError):
         DataConfig.from_dict({"name": "d", "resolution": 8,
-                              "augmentations": {"photo": {"crop_scale": [0.0, 1.0]}}})
+                              "augmentations": {"photo": {"scale": [0.0, 1.2]}}})
 
 
 def test_validate_rejects_bad_flip():

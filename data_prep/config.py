@@ -14,6 +14,9 @@ DEFAULT_BG_DIRS = ["backgrounds/real", "backgrounds/pokemon_battle"]
 DEFAULT_BG_PROB = 0.8
 DEFAULT_FLIP = 0.5
 DEFAULT_CROP_SCALE = (0.6, 1.0)
+DEFAULT_PHOTO_SCALE = (0.9, 1.2)
+DEFAULT_PHOTO_POS_X = (0.4, 0.6)
+DEFAULT_PHOTO_POS_Y = (0.4, 0.6)
 _FLAT_AUG_KEYS = {"scale", "scale_method", "position", "rotation", "background", "flip"}
 
 
@@ -93,10 +96,22 @@ class ColorCfg:
 
 
 @dataclass
+class PhotoBgCfg:
+    white: bool = True
+    black: bool = True
+    dirs: list[str] = field(default_factory=lambda: list(DEFAULT_BG_DIRS))
+    weights: list[float] | None = None
+
+
+@dataclass
 class PhotoAugCfg:
-    crop_scale: tuple[float, float] = DEFAULT_CROP_SCALE
-    color: ColorCfg = field(default_factory=ColorCfg)
+    scale: tuple[float, float] = DEFAULT_PHOTO_SCALE
+    position: PositionAugCfg = field(
+        default_factory=lambda: PositionAugCfg(x=DEFAULT_PHOTO_POS_X, y=DEFAULT_PHOTO_POS_Y))
+    color: ColorCfg = field(default_factory=lambda: ColorCfg(
+        brightness=0.2, contrast=0.3, saturation=0.2, hue=0.1))
     flip: float = DEFAULT_FLIP
+    background: PhotoBgCfg = field(default_factory=PhotoBgCfg)
 
 
 @dataclass
@@ -131,13 +146,21 @@ def _parse_sprite(sp: dict) -> SpriteAugCfg:
 
 def _parse_photo(ph: dict) -> PhotoAugCfg:
     col = ph.get("color", {}) or {}
+    po = ph.get("position", {}) or {}
+    bg = ph.get("background", {}) or {}
     return PhotoAugCfg(
-        crop_scale=_pair(ph.get("crop_scale"), DEFAULT_CROP_SCALE),
+        scale=_pair(ph.get("scale"), DEFAULT_PHOTO_SCALE),
+        position=PositionAugCfg(x=_pair(po.get("x"), DEFAULT_PHOTO_POS_X),
+                                y=_pair(po.get("y"), DEFAULT_PHOTO_POS_Y)),
         color=ColorCfg(brightness=float(col.get("brightness", 0.2)),
-                       contrast=float(col.get("contrast", 0.2)),
+                       contrast=float(col.get("contrast", 0.3)),
                        saturation=float(col.get("saturation", 0.2)),
-                       hue=float(col.get("hue", 0.05))),
+                       hue=float(col.get("hue", 0.1))),
         flip=float(ph.get("flip", DEFAULT_FLIP)),
+        background=PhotoBgCfg(white=bool(bg.get("white", True)),
+                              black=bool(bg.get("black", True)),
+                              dirs=list(bg.get("dirs", DEFAULT_BG_DIRS)),
+                              weights=bg.get("weights")),
     )
 
 
@@ -209,9 +232,9 @@ class DataConfig:
         for c in self.selection.categories:
             if c not in CATEGORIES:
                 raise ValueError(f"unknown category {c!r}")
-        lo, hi = self.augmentations.photo.crop_scale
-        if not (0.0 < lo <= hi <= 1.0):
-            raise ValueError("photo.crop_scale must satisfy 0 < lo <= hi <= 1")
+        lo, hi = self.augmentations.photo.scale
+        if not (0.0 < lo <= hi):
+            raise ValueError("photo.scale must satisfy 0 < lo <= hi")
         for fl in (self.augmentations.sprite.flip, self.augmentations.photo.flip):
             if not (0.0 <= fl <= 1.0):
                 raise ValueError("flip probability must be in [0,1]")

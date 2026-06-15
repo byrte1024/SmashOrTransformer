@@ -84,6 +84,7 @@ class ColorJitter(Augmentation):
         self.b, self.c, self.s, self.h = brightness, contrast, saturation, hue
 
     def apply(self, img, rng, resolution):
+        alpha = img.getchannel("A") if img.mode == "RGBA" else None
         im = img.convert("RGB")
         if self.b:
             im = ImageEnhance.Brightness(im).enhance(1 + rng.uniform(-self.b, self.b))
@@ -95,7 +96,48 @@ class ColorJitter(Augmentation):
             hsv = np.asarray(im.convert("HSV")).astype(np.int16)
             hsv[..., 0] = (hsv[..., 0] + int(rng.uniform(-self.h, self.h) * 255)) % 256
             im = Image.fromarray(hsv.astype(np.uint8), "HSV").convert("RGB")
+        if alpha is not None:                  # keep alpha so downstream paste works
+            im = im.convert("RGBA")
+            im.putalpha(alpha)
         return im
+
+
+class ScaleFit(Augmentation):
+    """Resize preserving aspect so the longest side = uniform(scale_range)*res
+    (lets the image be larger or smaller than the canvas)."""
+    def __init__(self, scale_range, method="bilinear"):
+        self.scale_range, self.method = scale_range, method
+
+    def apply(self, img, rng, resolution):
+        target = rng.uniform(*self.scale_range) * resolution
+        w, h = img.size
+        f = target / max(w, h)
+        return img.resize((max(1, round(w * f)), max(1, round(h * f))), _RESAMPLE[self.method])
+
+
+class CompositeRandomBackground(Augmentation):
+    """Flatten an RGBA canvas onto a randomly chosen background -- white, black,
+    or a pool image -- each enabled option equally likely. For opaque images
+    (booru) the margins/letterbox show the chosen background."""
+    def __init__(self, pool=None, use_white=True, use_black=True):
+        self.pool, self.use_white, self.use_black = pool, use_white, use_black
+
+    def apply(self, img, rng, resolution):
+        options = []
+        if self.use_white:
+            options.append("white")
+        if self.use_black:
+            options.append("black")
+        if self.pool is not None and not self.pool.empty():
+            options.append("pool")
+        choice = options[int(rng.integers(len(options)))] if options else "white"
+        if choice == "pool":
+            bg = self.pool.sample(rng, resolution).copy()
+        else:
+            bg = Image.new("RGB", (resolution, resolution),
+                           (0, 0, 0) if choice == "black" else (255, 255, 255))
+        bg.paste(img, (0, 0), img)
+        return bg
 
 
 class ToRGB(Augmentation):
@@ -188,11 +230,13 @@ def build_sprite_aug(cfg: DataConfig) -> Compose:
 
 def build_photo_aug(cfg: DataConfig) -> Compose:
     p = cfg.augmentations.photo
+    pool = BackgroundPool(p.background.dirs, p.background.weights)
     return Compose([
-        RandomResizedCrop(p.crop_scale),
         ColorJitter(p.color.brightness, p.color.contrast, p.color.saturation, p.color.hue),
         HorizontalFlip(p.flip),
-        ToRGB(),
+        ScaleFit(p.scale),                                  # size 0.9-1.2 of canvas
+        Position(p.position.x, p.position.y),               # ~10% position jitter
+        CompositeRandomBackground(pool, p.background.white, p.background.black),
     ])
 
 

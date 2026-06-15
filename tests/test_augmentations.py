@@ -4,7 +4,7 @@ from data_prep.config import DataConfig
 from data_prep.augmentations import (
     Scale, Rotate, Position, CompositeBackground, Compose, build_augmentations,
     HorizontalFlip, RandomResizedCrop, ColorJitter, ToRGB, BackgroundPool,
-    build_sprite_aug, build_photo_aug,
+    ScaleFit, CompositeRandomBackground, build_sprite_aug, build_photo_aug,
 )
 
 
@@ -78,14 +78,31 @@ def test_random_resized_crop_shape():
     assert out.size == (24, 24)
 
 
-def test_color_jitter_changes_and_deterministic():
+def test_color_jitter_changes_preserves_alpha_deterministic():
     img = _sprite(20, 20)
     a = np.asarray(ColorJitter(0.4, 0.4, 0.4, 0.1).apply(img, np.random.default_rng(3), 20))
     b = np.asarray(ColorJitter(0.4, 0.4, 0.4, 0.1).apply(img, np.random.default_rng(3), 20))
-    assert a.shape == (20, 20, 3)
+    assert a.shape == (20, 20, 4)                # alpha preserved (RGBA in -> RGBA out)
     assert np.array_equal(a, b)                  # deterministic for fixed rng
-    plain = np.asarray(img.convert("RGB"))
-    assert not np.array_equal(a, plain)          # actually jittered
+    plain = np.asarray(img)
+    assert not np.array_equal(a[..., :3], plain[..., :3])   # RGB jittered
+    assert np.array_equal(a[..., 3], plain[..., 3])         # alpha untouched
+
+
+def test_scalefit_preserves_aspect():
+    out = ScaleFit((1.0, 1.0)).apply(_sprite(40, 20), np.random.default_rng(0), 64)
+    assert out.size == (64, 32)                  # longest side -> 64, 2:1 kept
+
+
+def test_composite_random_background_white_or_black():
+    rng = np.random.default_rng(0)
+    canvas = Position((0.5, 0.5), (0.5, 0.5)).apply(_sprite(16, 16), rng, 64)
+    w = np.asarray(CompositeRandomBackground(pool=None, use_white=True, use_black=False)
+                   .apply(canvas, rng, 64))
+    assert tuple(w[0, 0]) == (255, 255, 255) and tuple(w[32, 32]) == (255, 0, 0)
+    blk = np.asarray(CompositeRandomBackground(pool=None, use_white=False, use_black=True)
+                     .apply(canvas, rng, 64))
+    assert tuple(blk[0, 0]) == (0, 0, 0)
 
 
 def test_background_pool_composites_non_white(tmp_path):
