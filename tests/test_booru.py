@@ -51,33 +51,33 @@ def test_process_pokemon_downloads_and_resumes(tmp_path, monkeypatch):
         _post(12, 98, "charizard charmander"),                 # group -> filtered out
         _post(13, 97, "charizard flying", url="http://x/b.png"),
     ]
-    calls = {"search": 0, "download": 0}
+    calls = {"search": 0, "fetch": 0}
 
     def fake_search(session, tag, limit, pid=0):
         calls["search"] += 1
         return page0 if pid == 0 else []                       # page 1 empty -> stop
 
-    def fake_download(session, url, dest):
-        calls["download"] += 1
-        Path(dest).write_bytes(b"\x89PNG fake")
+    def fake_fetch(session, url):
+        calls["fetch"] += 1
+        return b"\x89PNG fake"
 
     monkeypatch.setattr(booru, "search", fake_search)
-    monkeypatch.setattr(booru, "download", fake_download)
+    monkeypatch.setattr(booru, "fetch_bytes", fake_fetch)
 
     n = process_pokemon(None, 6, "charizard", str(tmp_path), idx, top=10,
-                        page_size=100, max_pages=10, min_score=0, sleep_dl=0,
-                        sleep_page=0, force=False)
+                        page_size=100, max_pages=10, min_score=0,
+                        sleep_page=0, force=False, download_workers=1)
     folder = tmp_path / "6" / "booru"
     assert n == 2                                    # group pic filtered, 2 kept
     assert len(list(folder.glob("[0-9]*.*"))) == 2
     rows = list(csv.DictReader(open(folder / "meta.csv")))
     assert len(rows) == 2 and rows[0]["post_id"] == "11"
 
-    before = calls["download"]
+    before = calls["fetch"]
     n2 = process_pokemon(None, 6, "charizard", str(tmp_path), idx, top=2,
-                         page_size=100, max_pages=10, min_score=0, sleep_dl=0,
-                         sleep_page=0, force=False)
-    assert n2 == -1 and calls["download"] == before  # resume skip, no new downloads
+                         page_size=100, max_pages=10, min_score=0,
+                         sleep_page=0, force=False, download_workers=1)
+    assert n2 == -1 and calls["fetch"] == before     # resume skip, no new fetches
 
 
 def test_collect_clean_auto_grows_across_pages(monkeypatch):
@@ -139,3 +139,56 @@ def test_delete_booru_removes_only_selected(tmp_path):
     assert (tmp_path / "1").exists()                  # only booru/ removed, sprites kept
     # deleting again is a no-op (folder already gone)
     assert delete_booru(str(tmp_path), [1]) == 0
+
+
+def test_process_pokemon_parallel_downloads_preserve_order(tmp_path, monkeypatch):
+    import threading
+    idx = build_poke_index([(6, "charizard")])
+    posts = [_post(10 + i, 50 - i, "charizard fire", url=f"http://x/{i}.jpg") for i in range(6)]
+
+    def fake_search(session, tag, limit, pid=0):
+        return posts if pid == 0 else []
+
+    lock = threading.Lock(); seen = []
+    def fake_fetch(session, url):
+        with lock:
+            seen.append(url)
+        return b"x"
+
+    monkeypatch.setattr(booru, "search", fake_search)
+    monkeypatch.setattr(booru, "fetch_bytes", fake_fetch)
+    n = process_pokemon(None, 6, "charizard", str(tmp_path), idx, top=6, page_size=100,
+                        max_pages=10, min_score=0, sleep_page=0, force=False,
+                        download_workers=4)
+    assert n == 6 and len(seen) == 6
+    rows = list(csv.DictReader(open(tmp_path / "6" / "booru" / "meta.csv")))
+    # meta is rank-sorted even though downloads ran concurrently
+    assert [int(r["rank"]) for r in rows] == [0, 1, 2, 3, 4, 5]
+    assert [int(r["post_id"]) for r in rows] == [10, 11, 12, 13, 14, 15]
+
+
+def test_process_pokemon_backfills_dead_links(tmp_path, monkeypatch):
+    idx = build_poke_index([(6, "charizard")])
+    # 8 clean candidates; even-numbered urls are dead (404), odd succeed
+    posts = [_post(10 + i, 50 - i, "charizard fire", url=f"http://x/{i}.jpg") for i in range(8)]
+
+    def fake_search(session, tag, limit, pid=0):
+        return posts if pid == 0 else []
+
+    def fake_fetch(session, url):
+        i = int(url.rsplit("/", 1)[1].split(".")[0])
+        if i % 2 == 0:
+            raise RuntimeError("404 dead link")
+        return b"x"
+
+    monkeypatch.setattr(booru, "search", fake_search)
+    monkeypatch.setattr(booru, "fetch_bytes", fake_fetch)
+    # want top=3 -> must skip the dead even-url posts and backfill from odd ones
+    n = process_pokemon(None, 6, "charizard", str(tmp_path), idx, top=3, page_size=100,
+                        max_pages=10, min_score=0, sleep_page=0, force=False,
+                        download_workers=1)
+    assert n == 3
+    rows = list(csv.DictReader(open(tmp_path / "6" / "booru" / "meta.csv")))
+    # surviving = odd-url posts 11(url1), 13(url3), 15(url5); contiguous ranks
+    assert [int(r["post_id"]) for r in rows] == [11, 13, 15]
+    assert [int(r["rank"]) for r in rows] == [0, 1, 2]

@@ -15,6 +15,8 @@ import csv
 import re
 import shutil
 import time
+from concurrent.futures import ThreadPoolExecutor
+from itertools import islice
 from pathlib import Path
 import requests
 from tqdm import tqdm
@@ -139,18 +141,18 @@ def search(session, tag, limit, pid=0) -> list[dict]:
     return data if isinstance(data, list) else data.get("post", [])
 
 
-def download(session, url, dest) -> None:
+def fetch_bytes(session, url) -> bytes:
     r = session.get(url, headers=UA, timeout=60)
     r.raise_for_status()
-    Path(dest).write_bytes(r.content)
+    return r.content
 
 
-def collect_clean(session, candidates, poke_index, top, page_size, max_pages,
-                  min_score=0, sleep_page=0.0) -> list[dict]:
-    """Paginate score-sorted results for the first candidate tag that returns
-    anything, accumulating clean posts until `top` are found, a page comes back
-    empty, or `max_pages` is reached. Auto-grows: stops as soon as `top` is met."""
-    kept, seen = [], set()
+def iter_clean(session, candidates, poke_index, page_size, max_pages,
+               min_score=0, sleep_page=0.0):
+    """Lazily yield clean posts in score order, paginating the first candidate
+    tag that returns results up to max_pages. Lazy so callers can pull only as
+    many as they need (e.g. to backfill dead-link downloads)."""
+    seen = set()
     for tag in candidates:
         posts = search(session, tag, page_size, 0)
         if not posts:
@@ -163,9 +165,7 @@ def collect_clean(session, candidates, poke_index, top, page_size, max_pages,
                     continue
                 seen.add(pid)
                 if passes(p, poke_index, min_score):
-                    kept.append(p)
-                    if len(kept) >= top:
-                        return kept
+                    yield p
             page += 1
             if page >= max_pages:
                 break
@@ -175,34 +175,64 @@ def collect_clean(session, candidates, poke_index, top, page_size, max_pages,
             if not posts:
                 break
         break                       # first candidate with results wins
-    return kept
+
+
+def collect_clean(session, candidates, poke_index, top, page_size, max_pages,
+                  min_score=0, sleep_page=0.0) -> list[dict]:
+    """First `top` clean posts (score order). Thin wrapper over iter_clean."""
+    out = []
+    for p in iter_clean(session, candidates, poke_index, page_size, max_pages,
+                        min_score, sleep_page):
+        out.append(p)
+        if len(out) >= top:
+            break
+    return out
 
 
 def process_pokemon(session, pid, name, images_dir, poke_index, top, page_size,
-                    max_pages, min_score, sleep_dl, sleep_page, force) -> int:
+                    max_pages, min_score, sleep_page, force, download_workers=16) -> int:
     folder = Path(images_dir) / str(pid) / "booru"
     existing = list(folder.glob("[0-9]*.*")) if folder.exists() else []
     if existing and len(existing) >= top and not force:
         return -1                                  # already done -> resume skip
     folder.mkdir(parents=True, exist_ok=True)
 
-    kept = collect_clean(session, search_candidates(name), poke_index, top,
-                         page_size, max_pages, min_score, sleep_page)
+    # Pull clean candidates lazily and fetch them in parallel chunks. A dead
+    # link (404 for a deleted image) is treated like a filter reject: we just
+    # pull more candidates until `top` images actually download (or we run out).
+    gen = iter_clean(session, search_candidates(name), poke_index, page_size,
+                     max_pages, min_score, sleep_page)
 
-    rows = []
-    for rank, p in enumerate(kept):
-        url = p["file_url"]
-        ext = url.rsplit(".", 1)[-1].split("?")[0][:4]
-        dest = folder / f"{rank:02d}_{p['id']}.{ext}"
+    def _fetch(p):
         try:
-            download(session, url, dest)
-        except Exception as e:
-            print(f"  [{pid}] download failed {url}: {e}")
-            continue
-        rows.append({"rank": rank, "post_id": p["id"], "score": p.get("score"),
-                     "rating": p.get("rating"), "file_url": url})
-        if sleep_dl:
-            time.sleep(sleep_dl)
+            ext = p["file_url"].rsplit(".", 1)[-1].split("?")[0][:4]
+            return (p, ext, fetch_bytes(session, p["file_url"]))
+        except Exception:
+            return None                # dead link / fetch error -> backfill more
+
+    rows, rank, dead = [], 0, 0
+    while rank < top:
+        chunk = list(islice(gen, top - rank))      # only pull what we still need
+        if not chunk:
+            break
+        if download_workers > 1 and len(chunk) > 1:
+            with ThreadPoolExecutor(max_workers=download_workers) as ex:
+                results = list(ex.map(_fetch, chunk))
+        else:
+            results = [_fetch(p) for p in chunk]
+        for res in results:
+            if rank >= top:
+                break
+            if res is None:
+                dead += 1
+                continue
+            p, ext, data = res
+            (folder / f"{rank:02d}_{p['id']}.{ext}").write_bytes(data)
+            rows.append({"rank": rank, "post_id": p["id"], "score": p.get("score"),
+                         "rating": p.get("rating"), "file_url": p["file_url"]})
+            rank += 1
+    if dead:
+        print(f"  [{pid}] {name}: skipped {dead} dead link(s), kept {len(rows)}")
     with open(folder / "meta.csv", "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["rank", "post_id", "score", "rating", "file_url"])
         w.writeheader(); w.writerows(rows)
@@ -221,8 +251,8 @@ def delete_booru(images_dir, ids) -> int:
 
 
 def run(names_csv="pokemon_names.csv", images_dir="images", top=10, page_size=100,
-        max_pages=10, min_score=0, ids=None, limit=None, sleep=1.0, sleep_dl=0.25,
-        sleep_page=0.5, force=False, delete=False):
+        max_pages=10, min_score=0, ids=None, limit=None, sleep=0.05,
+        sleep_page=0.0, force=False, delete=False, download_workers=16):
     names = load_names(names_csv)
     poke_index = build_poke_index(names)
     if ids:
@@ -240,7 +270,8 @@ def run(names_csv="pokemon_names.csv", images_dir="images", top=10, page_size=10
     got, skipped, empty = 0, 0, 0
     for pid, name in tqdm(names, desc="booru", unit="pkmn"):
         n = process_pokemon(session, pid, name, images_dir, poke_index, top,
-                            page_size, max_pages, min_score, sleep_dl, sleep_page, force)
+                            page_size, max_pages, min_score, sleep_page, force,
+                            download_workers)
         if n == -1:
             skipped += 1
             continue
@@ -265,9 +296,10 @@ def main(argv=None):
     p.add_argument("--min-score", type=int, default=0)
     p.add_argument("--ids", default=None, help="comma-separated dex ids (e.g. 6,282)")
     p.add_argument("--limit", type=int, default=None, help="only the first N pokemon")
-    p.add_argument("--sleep", type=float, default=1.0, help="seconds between pokemon")
-    p.add_argument("--sleep-dl", type=float, default=0.25, help="seconds between downloads")
-    p.add_argument("--sleep-page", type=float, default=0.5, help="seconds between pages")
+    p.add_argument("--sleep", type=float, default=0.05, help="seconds between pokemon")
+    p.add_argument("--sleep-page", type=float, default=0.0, help="seconds between pages")
+    p.add_argument("--download-workers", type=int, default=16,
+                   help="parallel image downloads per pokemon")
     p.add_argument("--force", action="store_true", help="re-download even if present")
     p.add_argument("--del", dest="delete", action="store_true",
                    help="remove all previously fetched booru/ folders and exit "
@@ -276,8 +308,8 @@ def main(argv=None):
     ids = [int(x) for x in args.ids.split(",")] if args.ids else None
     run(names_csv=args.names, images_dir=args.images, top=args.top,
         page_size=args.page_size, max_pages=args.max_pages, min_score=args.min_score,
-        ids=ids, limit=args.limit, sleep=args.sleep, sleep_dl=args.sleep_dl,
-        sleep_page=args.sleep_page, force=args.force, delete=args.delete)
+        ids=ids, limit=args.limit, sleep=args.sleep, sleep_page=args.sleep_page,
+        force=args.force, delete=args.delete, download_workers=args.download_workers)
 
 
 if __name__ == "__main__":
