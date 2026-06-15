@@ -99,9 +99,13 @@ def load_pipeline(model_id=DEFAULT_MODEL_ID, device="cuda"):
     dtype = torch.float16 if use_cuda else torch.float32
     pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=dtype,
                                                    safety_checker=None)
-    pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config)
+    # clip_sample=False: DDIM's default clamps pred_original_sample to [-1,1],
+    # which zeros DOODL's gradients through scheduler.step. gradient checkpointing
+    # keeps DOODL's backprop-through-the-chain within 12 GB.
+    pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config, clip_sample=False)
     pipe.to("cuda" if use_cuda else "cpu")
     pipe.set_progress_bar_config(disable=True)
+    pipe.unet.enable_gradient_checkpointing()
     for p in pipe.unet.parameters():
         p.requires_grad_(False)
     for p in pipe.vae.parameters():
@@ -224,11 +228,15 @@ def _smash_res(smash_model):
 class DoodlGuidance(GuidanceStrategy):
     """Optimize the initial noise latent so the final decoded image hits the
     target, backpropagating through a short deterministic DDIM chain."""
-    def __init__(self, steps, guidance_scale, sd_guidance_scale, opt_iters=2, lr=0.1):
-        self.steps, self.sd = steps, sd_guidance_scale
+    def __init__(self, steps, guidance_scale, sd_guidance_scale, opt_iters=2, lr=0.1,
+                 max_chain=12):
+        self.sd = sd_guidance_scale
+        # cap the differentiated chain length: DOODL backprops through every step,
+        # so a long chain blows up memory even with gradient checkpointing.
+        self.steps = min(steps, max_chain)
         self.opt_iters, self.lr = opt_iters, lr
 
-    def _sample(self, pipe, emb, latents, dtype, dev):
+    def _sample(self, pipe, emb, latents, dev):
         pipe.scheduler.set_timesteps(self.steps, device=dev)
         for t in pipe.scheduler.timesteps:
             lat_in = pipe.scheduler.scale_model_input(torch.cat([latents] * 2), t)
@@ -249,13 +257,13 @@ class DoodlGuidance(GuidanceStrategy):
         opt = torch.optim.Adam([z0], lr=self.lr)
         for _ in range(self.opt_iters):
             opt.zero_grad()
-            latents = self._sample(pipe, emb, z0, dtype, dev)
+            latents = self._sample(pipe, emb, z0, dev)
             img01 = _decode01(pipe, latents)
             loss = ((_score_tensor(smash_model, img01, mean, std, res) - target) ** 2).mean()
             loss.backward()
             opt.step()
         with torch.no_grad():
-            return to_pil(_decode01(pipe, self._sample(pipe, emb, z0.detach(), dtype, dev)))
+            return to_pil(_decode01(pipe, self._sample(pipe, emb, z0.detach(), dev)))
 
 
 class SdsGuidance(GuidanceStrategy):
