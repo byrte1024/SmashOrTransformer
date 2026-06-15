@@ -2,6 +2,7 @@ from __future__ import annotations
 import numpy as np
 import torch
 from scipy.stats import spearmanr, pearsonr
+from tqdm import tqdm
 from .loss import soft_bce
 
 
@@ -33,12 +34,13 @@ def mae(pred, true) -> float:
     return float(np.mean(np.abs(np.asarray(pred) - np.asarray(true))))
 
 
-def evaluate(model, loader, device) -> dict:
+def evaluate(model, loader, device, desc=None) -> dict:
     model.eval()
     all_ids, all_pred, all_true = [], [], []
     loss_sum, n = 0.0, 0
+    iterator = tqdm(loader, desc=desc, unit="batch") if desc else loader
     with torch.no_grad():
-        for t, y, pid in loader:
+        for t, y, pid in iterator:
             t = t.to(device); y = y.to(device)
             logit = model(t)
             loss_sum += float(soft_bce(logit, y)) * len(y)

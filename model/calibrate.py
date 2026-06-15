@@ -64,7 +64,7 @@ def apply_calibration(pred, xs, ys) -> np.ndarray:
 def _predict_split(model, dataset_dir, split, mean, std, resolution, device, batch_size):
     ds = EvalDataset(dataset_dir, split, mean, std, resolution)
     loader = DataLoader(ds, batch_size=batch_size)
-    out = evaluate(model, loader, device)
+    out = evaluate(model, loader, device, desc=f"scoring {split}")
     return np.asarray(out["y_pred"]), np.asarray(out["y_true"])
 
 
