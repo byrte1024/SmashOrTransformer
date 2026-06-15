@@ -23,6 +23,7 @@ import numpy as np
 import torch
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
+from data_prep.imagestore import DatasetImages
 from .dataset import canonical_render, to_tensor
 from .metrics import spearman
 from .infer import load_model
@@ -132,8 +133,9 @@ def run(checkpoint_path, dataset_dir=None, device="cuda", out_dir="results",
     maps = json.loads(cpath.read_text())["maps"] if cpath.exists() else None
 
     d = np.load(Path(dataset_dir) / "data.npz", allow_pickle=True)
-    images, pid, name, smash = (d["images"], d["pokemon_id"], d["source_name"],
-                                d["smash_pct"])
+    images = DatasetImages(Path(dataset_dir), d)
+    pid, name, smash = (np.asarray(d["pokemon_id"]), np.asarray(d["source_name"]),
+                        np.asarray(d["smash_pct"]))
     val_set = set(int(pid[i]) for i in
                   json.loads((Path(dataset_dir) / "split.json").read_text())["val"])
 

@@ -3,19 +3,16 @@ import csv
 import json
 from pathlib import Path
 import numpy as np
-from PIL import Image, ImageSequence
 from tqdm import tqdm
 from .config import DataConfig
 from .selection import load_labels, load_records, select_pokemon
 from .splits import build_split
+from .imagestore import ImageStoreWriter, decode_rgba
 
 
 def load_sprite(path) -> np.ndarray:
     """Load an image as uint8 RGBA at native size; first frame for animations."""
-    im = Image.open(path)
-    if getattr(im, "is_animated", False):
-        im = next(ImageSequence.Iterator(im)).copy()
-    return np.asarray(im.convert("RGBA"), dtype=np.uint8)
+    return decode_rgba(path)
 
 
 def prepare(cfg: DataConfig, images_dir, labels_csv, out_root) -> Path:
@@ -23,10 +20,12 @@ def prepare(cfg: DataConfig, images_dir, labels_csv, out_root) -> Path:
     out = Path(out_root) / cfg.name
     out.mkdir(parents=True, exist_ok=True)
 
-    images, pid_arr, cat_arr, gen_arr, name_arr = [], [], [], [], []
+    pid_arr, cat_arr, gen_arr, name_arr = [], [], [], []
     smash_arr, votes_arr = [], []
     manifest_rows, reports, skipped = [], {}, []
 
+    # stream image bytes to a packed blob, freeing each (O(1) memory)
+    writer = ImageStoreWriter(out / "images.bin")
     for pid in tqdm(sorted(labels.keys()), desc="Building dataset", unit="pkmn"):
         recs = load_records(images_dir, pid, labels)
         if not recs:
@@ -35,37 +34,38 @@ def prepare(cfg: DataConfig, images_dir, labels_csv, out_root) -> Path:
         reports[pid] = report
         for r in kept:
             try:
-                arr = load_sprite(r.path)
+                data = Path(r.path).read_bytes()
+                decode_rgba(data)        # validate it decodes (transient); skip if not
             except Exception as e:
                 # a few downloaded sprites are corrupt/undecodable; skip them
                 # rather than aborting the whole build (recorded in stats).
                 skipped.append({"path": str(r.path), "error": type(e).__name__})
                 continue
-            images.append(arr)
+            writer.add_bytes(data)
             pid_arr.append(pid); cat_arr.append(r.category); gen_arr.append(r.gen)
             name_arr.append(r.source_name)
             smash_arr.append(r.smash_pct); votes_arr.append(r.total_votes)
             manifest_rows.append({"pokemon_id": pid, "source_name": r.source_name,
                                   "category": r.category, "gen": r.gen,
                                   "smash_pct": r.smash_pct, "total_votes": r.total_votes})
+    offsets, lengths = writer.close()
 
     if skipped:
         print(f"warning: skipped {len(skipped)} unreadable image(s); "
               "see stats.json 'skipped_unreadable'")
 
-    if not images:
+    if not pid_arr:
+        (out / "images.bin").unlink(missing_ok=True)
         raise ValueError(
             f"No images selected for dataset {cfg.name!r}; "
             "check selection filters and that images_dir/labels_csv are correct."
         )
 
     pid_np = np.array(pid_arr, dtype=np.int64)
-    images_obj = np.empty(len(images), dtype=object)
-    for i, a in enumerate(images):
-        images_obj[i] = a
 
     np.savez(out / "data.npz",
-             images=images_obj,
+             offsets=offsets,
+             lengths=lengths,
              pokemon_id=pid_np,
              category=np.array(cat_arr),
              gen=np.array(gen_arr, dtype=np.int64),
@@ -91,7 +91,7 @@ def prepare(cfg: DataConfig, images_dir, labels_csv, out_root) -> Path:
     smash_hist_np = np.array(smash_arr, dtype=np.float64)
     hist_counts, hist_edges = np.histogram(smash_hist_np, bins=10, range=(0.0, 1.0))
     (out / "stats.json").write_text(json.dumps(
-        {"n_images": len(images), "n_pokemon": len(counts),
+        {"n_images": len(pid_arr), "n_pokemon": len(counts),
          "per_pokemon_counts": counts,
          "label_histogram": {"bins": hist_edges.tolist(), "counts": hist_counts.tolist()},
          "n_skipped_unreadable": len(skipped), "skipped_unreadable": skipped,

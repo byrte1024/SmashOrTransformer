@@ -22,12 +22,20 @@ def test_prepare_writes_all_outputs(mini_repo):
     assert (out / "split.json").exists()
     assert (out / "stats.json").exists()
 
+    # packed-blob storage: pixels live in images.bin, npz holds offsets + metadata
+    assert (out / "images.bin").exists()
     data = np.load(out / "data.npz", allow_pickle=True)
-    n = len(data["images"])
-    assert n == len(data["pokemon_id"]) == len(data["smash_pct"]) == len(data["total_votes"])
-    assert data["images"][0].dtype == np.uint8 and data["images"][0].shape[2] == 4
+    assert "images" not in data.files
+    n = len(data["offsets"])
+    assert n == len(data["lengths"]) == len(data["pokemon_id"]) == len(data["smash_pct"])
     assert set(np.unique(data["pokemon_id"]).tolist()) == {1, 4, 7}
     assert float(data["smash_pct"].max()) <= 1.0
+
+    # images decode via DatasetImages -> RGBA uint8
+    from data_prep.imagestore import DatasetImages
+    store = DatasetImages(out, data)
+    assert len(store) == n
+    assert store[0].dtype == np.uint8 and store[0].shape[2] == 4
 
     split = json.loads((out / "split.json").read_text())
     assert set(split["train"]).isdisjoint(split["val"])

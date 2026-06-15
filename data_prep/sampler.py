@@ -6,6 +6,7 @@ from PIL import Image
 from .config import DataConfig
 from .augmentations import build_sprite_aug, build_photo_aug
 from .sampling import build_sampling
+from .imagestore import DatasetImages
 
 
 class DataSampler:
@@ -18,14 +19,14 @@ class DataSampler:
     def __init__(self, dataset_dir, split: str = "train", epoch: int = 0):
         self.dir = Path(dataset_dir)
         self.cfg = DataConfig.from_dict(json.loads((self.dir / "config.json").read_text()))
-        with np.load(self.dir / "data.npz", allow_pickle=True) as data:
-            self._images = data["images"]
-            self._row_pid = data["pokemon_id"]
-            self._smash = data["smash_pct"]
-            # total_votes is kept available for optional confidence-weighting by
-            # callers (e.g. weighting the loss by vote volume); not used internally.
-            self._votes = data["total_votes"]
-            self._cat = data["category"]
+        data = np.load(self.dir / "data.npz", allow_pickle=True)
+        self._row_pid = np.asarray(data["pokemon_id"])
+        self._smash = np.asarray(data["smash_pct"])
+        # total_votes is kept available for optional confidence-weighting by
+        # callers (e.g. weighting the loss by vote volume); not used internally.
+        self._votes = np.asarray(data["total_votes"])
+        self._cat = np.asarray(data["category"])
+        self._images = DatasetImages(self.dir, data)   # mmap blob (or legacy npz array)
 
         split_info = json.loads((self.dir / "split.json").read_text())
         self._rows = list(split_info[split])

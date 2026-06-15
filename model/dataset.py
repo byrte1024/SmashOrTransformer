@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
+from data_prep.imagestore import DatasetImages
 
 
 def canonical_render(sprite_rgba: np.ndarray, resolution: int) -> np.ndarray:
@@ -53,10 +54,10 @@ class EvalDataset(Dataset):
 
     def __init__(self, dataset_dir, split, mean, std, resolution):
         d = Path(dataset_dir)
-        with np.load(d / "data.npz", allow_pickle=True) as data:
-            self._images = data["images"]
-            self._pid = data["pokemon_id"]
-            self._smash = data["smash_pct"]
+        data = np.load(d / "data.npz", allow_pickle=True)
+        self._pid = np.asarray(data["pokemon_id"])
+        self._smash = np.asarray(data["smash_pct"])
+        self._images = DatasetImages(d, data)          # mmap blob (or legacy npz array)
         self._rows = list(json.loads((d / "split.json").read_text())[split])
         self.mean, self.std, self.resolution = mean, std, resolution
 
