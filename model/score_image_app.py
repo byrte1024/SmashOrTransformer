@@ -97,7 +97,7 @@ def build_result_image(model, cfg, calib, path, device="cuda", threshold=0.5,
 def _run_gui(runs_dir, device, threshold, initial_checkpoint=None, display_res=384):
     import pygame
     pygame.init()
-    SW = display_res + 250
+    SW = display_res + 300
     SH = display_res + 240
     screen = pygame.display.set_mode((SW, SH), pygame.RESIZABLE)
     pygame.display.set_caption("Smash or Pass - Pokemon scorer")
@@ -155,6 +155,21 @@ def _run_gui(runs_dir, device, threshold, initial_checkpoint=None, display_res=3
             do_load(paths[0])
         else:
             set_images(paths)
+
+    def browse_image():
+        # pygame has no file dialog; use tkinter's just for the OS picker
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            r = tk.Tk(); r.withdraw()
+            p = filedialog.askopenfilename(
+                title="Pick an image",
+                filetypes=[("Images", "*.png *.jpg *.jpeg *.webp *.bmp *.gif"), ("All", "*.*")])
+            r.destroy()
+            if p:
+                set_images([p])
+        except Exception as ex:
+            st["status"] = f"file dialog unavailable ({ex}); drag & drop instead"
 
     def step(delta):
         if st["images"]:
@@ -215,6 +230,8 @@ def _run_gui(runs_dir, device, threshold, initial_checkpoint=None, display_res=3
                     step(1)
                 elif e.key == pygame.K_s:
                     share()
+                elif e.key == pygame.K_o:
+                    browse_image()
                 elif e.key == pygame.K_ESCAPE:
                     running = False
             elif e.type == pygame.DROPFILE:
@@ -226,8 +243,8 @@ def _run_gui(runs_dir, device, threshold, initial_checkpoint=None, display_res=3
                 else:
                     for rect, key in st.get("_btns", []):
                         if rect.collidepoint(e.pos):
-                            {"prev": lambda: step(-1), "next": lambda: step(1),
-                             "share": share}[key](); break
+                            {"browse": browse_image, "prev": lambda: step(-1),
+                             "next": lambda: step(1), "share": share}[key](); break
         if drop_buf:
             handle_drop(drop_buf); drop_buf = []
 
@@ -264,16 +281,17 @@ def _run_gui(runs_dir, device, threshold, initial_checkpoint=None, display_res=3
 
         # buttons row + status
         st["_btns"] = []
-        bw, bh, by = 110, 36, H - 78
-        bx = SIDEBAR + 24
-        for key, label in [("prev", "< Prev"), ("next", "Next >"), ("share", "Share (s)")]:
+        bw, bh, by = 100, 36, H - 78
+        bx = SIDEBAR + 20
+        for key, label in [("browse", "Browse (o)"), ("prev", "< Prev"),
+                           ("next", "Next >"), ("share", "Share (s)")]:
             r = pygame.Rect(bx, by, bw, bh)
             button(r, label, st["_btns"], mouse)
             st["_btns"][-1] = (r, key)
-            bx += bw + 12
-        screen.blit(font.render(st["status"], True, TXT), (SIDEBAR + 24, H - 34))
-        screen.blit(small.render("drop image(s)/folder/.pt here  |  arrows navigate",
-                                 True, MUT), (SIDEBAR + 24, H - 14))
+            bx += bw + 10
+        screen.blit(font.render(st["status"], True, TXT), (SIDEBAR + 20, H - 34))
+        screen.blit(small.render("Browse, or drop image(s)/folder/.pt here  |  arrows navigate",
+                                 True, MUT), (SIDEBAR + 20, H - 14))
 
         pygame.display.flip()
         clock.tick(30)
