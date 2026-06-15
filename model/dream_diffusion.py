@@ -45,3 +45,122 @@ def smash_loss(smash_model, img01, target, mean, std, resolution):
 def to_pil(img01) -> Image.Image:
     arr = (img01[0].detach().clamp(0, 1).permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
     return Image.fromarray(arr)
+
+
+class GuidanceStrategy(ABC):
+    """Generate one 512x512 RGB image steered toward `target` smash score."""
+    @abstractmethod
+    def generate(self, pipe, smash_model, prompt, target, seed, mean, std) -> Image.Image:
+        ...
+
+
+def score_pil(smash_model, cfg, pil, calib, device="cuda") -> tuple[float, float]:
+    """Score a generated image with the calibrated model -> (raw%, calibrated%)."""
+    dev = torch.device(device if (device != "cuda" or torch.cuda.is_available()) else "cpu")
+    arr = np.asarray(pil.convert("RGBA"), dtype=np.uint8)
+    img = render_input(arr, cfg.resolution, True)   # stretch-to-square, matches eval
+    t = to_tensor(img, smash_model.data_config["mean"], smash_model.data_config["std"])
+    t = t.unsqueeze(0).to(dev)
+    with torch.no_grad():
+        raw = float(torch.sigmoid(smash_model(t).reshape(-1)[0]))
+    cal = float(apply_calibration([raw], calib[0], calib[1])[0]) if calib else raw
+    return raw * 100, cal * 100
+
+
+def _font(size):
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
+
+
+def _label(pil, text):
+    w, h = pil.size
+    bar = 28
+    out = Image.new("RGB", (w, h + bar), (20, 20, 20))
+    out.paste(pil, (0, 0))
+    ImageDraw.Draw(out).text((4, h + 4), text, fill=(235, 235, 235), font=_font(15))
+    return out
+
+
+def _grid(tiles, cols=4):
+    w, h = tiles[0].size
+    rows = (len(tiles) + cols - 1) // cols
+    g = Image.new("RGB", (cols * w, rows * h), (10, 10, 10))
+    for i, t in enumerate(tiles):
+        r, c = divmod(i, cols)
+        g.paste(t, (c * w, r * h))
+    return g
+
+
+def load_pipeline(model_id=DEFAULT_MODEL_ID, device="cuda"):
+    from diffusers import StableDiffusionPipeline, DDIMScheduler
+    use_cuda = device == "cuda" and torch.cuda.is_available()
+    dtype = torch.float16 if use_cuda else torch.float32
+    pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=dtype,
+                                                   safety_checker=None)
+    pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config)
+    pipe.to("cuda" if use_cuda else "cpu")
+    pipe.set_progress_bar_config(disable=True)
+    for p in pipe.unet.parameters():
+        p.requires_grad_(False)
+    for p in pipe.vae.parameters():
+        p.requires_grad_(False)
+    return pipe
+
+
+def run(checkpoint_path, out_dir="results/dream_diffusion", device="cuda",
+        methods=None, prompts=None, brackets=None, n_per=4, steps=30,
+        guidance_scale=200.0, sd_guidance_scale=7.5, model_id=DEFAULT_MODEL_ID,
+        seed0=0, pipe=None, strategies=None) -> Path:
+    methods = methods or ["xhat", "doodl", "sds"]
+    prompts = prompts or DEFAULT_PROMPTS
+    brackets = brackets if brackets is not None else DEFAULT_BRACKETS
+    smash_model, cfg = load_model(checkpoint_path, device=device, pretrained=False)
+    calib = load_calibration(checkpoint_path, fit="combined")
+    mean, std = smash_model.data_config["mean"], smash_model.data_config["std"]
+    if strategies is None:
+        strategies = _build_strategies(steps, guidance_scale, sd_guidance_scale)
+    if pipe is None:
+        pipe = load_pipeline(model_id, device)
+
+    out = Path(out_dir)
+    rows = []
+    for method in methods:
+        strat = strategies[method]
+        for cond_tag, prompt in prompts:
+            for b in brackets:
+                cell = out / method / cond_tag / f"bracket_{b:.1f}"
+                cell.mkdir(parents=True, exist_ok=True)
+                tiles = []
+                for k in range(n_per):
+                    seed = seed0 + k
+                    img = strat.generate(pipe, smash_model, prompt, b, seed, mean, std)
+                    raw, cal = score_pil(smash_model, cfg, img, calib, device)
+                    _label(img, f"raw {raw:.0f}% -> {cal:.0f}%").save(cell / f"{seed:03d}.png")
+                    tiles.append(_label(img, f"{cal:.0f}%"))
+                    rows.append({"method": method, "conditioning": cond_tag, "prompt": prompt,
+                                 "target": b, "seed": seed,
+                                 "achieved_raw_pct": round(raw, 2),
+                                 "achieved_calibrated_pct": round(cal, 2)})
+                _grid(tiles).save(out / f"grid_{method}_{cond_tag}_{b:.1f}.png")
+
+    with open(out / "manifest.csv", "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["method", "conditioning", "prompt", "target",
+                                          "seed", "achieved_raw_pct", "achieved_calibrated_pct"])
+        w.writeheader(); w.writerows(rows)
+
+    print(f"\nGenerated {len(rows)} images -> {out}/")
+    for method in methods:
+        for b in brackets:
+            cal_vals = [r["achieved_calibrated_pct"] for r in rows
+                        if r["method"] == method and r["target"] == b]
+            if cal_vals:
+                print(f"  {method:6s} target {b:.1f}: mean achieved {np.mean(cal_vals):.1f}%")
+    return out
+
+
+def _build_strategies(steps, guidance_scale, sd_guidance_scale):
+    return {"xhat": XHatGuidance(steps, guidance_scale, sd_guidance_scale),
+            "doodl": DoodlGuidance(steps, guidance_scale, sd_guidance_scale),
+            "sds": SdsGuidance(steps, guidance_scale, sd_guidance_scale)}
