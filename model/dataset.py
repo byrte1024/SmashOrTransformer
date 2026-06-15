@@ -22,6 +22,21 @@ def canonical_render(sprite_rgba: np.ndarray, resolution: int) -> np.ndarray:
     return np.asarray(bg, dtype=np.uint8)
 
 
+def stretch_render(sprite_rgba: np.ndarray, resolution: int) -> np.ndarray:
+    """Stretch (distort) to a res x res square on white -> RGB uint8. The model
+    sees a fully-filled square; aspect is not preserved."""
+    im = Image.fromarray(sprite_rgba, "RGBA").resize((resolution, resolution), Image.BILINEAR)
+    bg = Image.new("RGB", (resolution, resolution), (255, 255, 255))
+    bg.paste(im, (0, 0), im)
+    return np.asarray(bg, dtype=np.uint8)
+
+
+def render_input(sprite_rgba: np.ndarray, resolution: int, stretch: bool = True) -> np.ndarray:
+    """Render the MODEL input: stretch-to-square (default) if `stretch` else aspect-fit."""
+    return (stretch_render(sprite_rgba, resolution) if stretch
+            else canonical_render(sprite_rgba, resolution))
+
+
 def to_tensor(img_rgb_uint8: np.ndarray, mean, std) -> torch.Tensor:
     arr = img_rgb_uint8.astype(np.float32) / 255.0
     t = torch.from_numpy(arr).permute(2, 0, 1).contiguous()

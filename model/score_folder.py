@@ -19,7 +19,7 @@ import torch
 from PIL import Image
 from tqdm import tqdm
 from data_prep.prepare import load_sprite
-from .dataset import canonical_render, to_tensor
+from .dataset import canonical_render, render_input, to_tensor
 from .infer import load_model
 from .calibrate import apply_calibration
 from .results import _banner          # reuse the green/red banner drawer
@@ -64,7 +64,8 @@ def _load_names(names_csv) -> dict:
 
 
 def run(checkpoint_path, source, out_dir="results/external", device="cuda",
-        calibration="val", threshold=0.5, display_res=384, names=None) -> Path:
+        calibration="val", threshold=0.5, display_res=384, names=None,
+        stretch=True) -> Path:
     model, cfg = load_model(checkpoint_path, device=device, pretrained=False)
     dev = next(model.parameters()).device
     mean, std = model.data_config["mean"], model.data_config["std"]
@@ -82,7 +83,7 @@ def run(checkpoint_path, source, out_dir="results/external", device="cuda",
     for p in tqdm(paths, desc="scoring", unit="img"):
         sprite = load_sprite(p)
         disp = canonical_render(sprite, display_res)
-        t = to_tensor(canonical_render(sprite, cfg.resolution), mean, std).unsqueeze(0).to(dev)
+        t = to_tensor(render_input(sprite, cfg.resolution, stretch), mean, std).unsqueeze(0).to(dev)
         with torch.no_grad():
             raw = float(torch.sigmoid(model(t).reshape(-1)[0]))
         cal = float(apply_calibration([raw], cmap["xs"], cmap["ys"])[0]) if cmap else raw
@@ -124,10 +125,12 @@ def main(argv=None):
     p.add_argument("--threshold", type=float, default=0.5)
     p.add_argument("--display-res", type=int, default=384)
     p.add_argument("--names", default=None, help="optional CSV with columns stem,name")
+    p.add_argument("--stretch", action=argparse.BooleanOptionalAction, default=True,
+                   help="stretch-to-square model input (default) vs aspect-fit (--no-stretch)")
     args = p.parse_args(argv)
     run(args.checkpoint, args.source, out_dir=args.out, device=args.device,
         calibration=args.calibration, threshold=args.threshold,
-        display_res=args.display_res, names=args.names)
+        display_res=args.display_res, names=args.names, stretch=args.stretch)
 
 
 if __name__ == "__main__":

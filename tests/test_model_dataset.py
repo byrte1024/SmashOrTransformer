@@ -59,3 +59,14 @@ def test_eval_dataset_item_has_pokemon_id(mini_repo):
     assert t.shape == (3, 32, 32)
     assert isinstance(pid, int)
     assert 0.0 <= float(y) <= 1.0
+
+
+def test_render_input_stretch_vs_fit():
+    from model.dataset import render_input, stretch_render, canonical_render
+    arr = np.zeros((40, 10, 4), dtype=np.uint8); arr[:, :] = (200, 50, 50, 255)
+    s = render_input(arr, 16, stretch=True)
+    assert s.shape == (16, 16, 3) and (s == (200, 50, 50)).all()   # filled, distorted
+    f = render_input(arr, 16, stretch=False)
+    assert np.array_equal(f, canonical_render(arr, 16)) and (f == 255).any()  # fit + white pad
+    # default is stretch
+    assert np.array_equal(render_input(arr, 16), stretch_render(arr, 16))

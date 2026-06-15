@@ -22,7 +22,7 @@ import torch
 from PIL import Image
 from tqdm import tqdm
 from data_prep.prepare import load_sprite
-from .dataset import canonical_render, to_tensor
+from .dataset import canonical_render, render_input, to_tensor
 from .infer import load_model
 from .calibrate import apply_calibration
 from .results import annotate_avg, annotate_portrait, _font
@@ -49,11 +49,11 @@ def _gather(images_dir):
     return out
 
 
-def _score_paths(model, paths, res, mean, std, device, batch_size):
+def _score_paths(model, paths, res, mean, std, device, batch_size, stretch=True):
     raws = np.empty(len(paths), dtype=float)
     for start in tqdm(range(0, len(paths), batch_size), desc="scoring", unit="batch"):
         batch = paths[start:start + batch_size]
-        x = torch.stack([to_tensor(canonical_render(load_sprite(p), res), mean, std)
+        x = torch.stack([to_tensor(render_input(load_sprite(p), res, stretch), mean, std)
                          for p in batch]).to(device)
         with torch.no_grad():
             raws[start:start + len(x)] = torch.sigmoid(model(x).reshape(-1)).cpu().numpy()
@@ -76,7 +76,7 @@ def _matrix(tiles, header, cols=5):
 
 def run(checkpoint_path, images_dir="images", out_dir="results/booru", device="cuda",
         calibration="val", threshold=0.5, display_res=384, tile_res=180,
-        names=None, batch_size=64) -> Path:
+        names=None, batch_size=64, stretch=True) -> Path:
     model, cfg = load_model(checkpoint_path, device=device, pretrained=False)
     dev = next(model.parameters()).device
     mean, std = model.data_config["mean"], model.data_config["std"]
@@ -93,7 +93,8 @@ def run(checkpoint_path, images_dir="images", out_dir="results/booru", device="c
         raise ValueError(f"no images/*/booru/ folders found under {images_dir!r}")
 
     flat = [(pid, p) for pid, imgs, _ in entries for p in imgs]
-    raw = _score_paths(model, [p for _, p in flat], cfg.resolution, mean, std, dev, batch_size)
+    raw = _score_paths(model, [p for _, p in flat], cfg.resolution, mean, std, dev,
+                       batch_size, stretch)
     cal = apply_calibration(raw, cmap["xs"], cmap["ys"]) if cmap else raw
     by_pid = {}
     for (pid, path), c in zip(flat, cal):
@@ -174,10 +175,13 @@ def main(argv=None):
     p.add_argument("--display-res", type=int, default=384)
     p.add_argument("--tile-res", type=int, default=180)
     p.add_argument("--names", default="pokemon_names.csv")
+    p.add_argument("--stretch", action=argparse.BooleanOptionalAction, default=True,
+                   help="stretch-to-square model input (default) vs aspect-fit (--no-stretch)")
     args = p.parse_args(argv)
     run(args.checkpoint, images_dir=args.images, out_dir=args.out, device=args.device,
         calibration=args.calibration, threshold=args.threshold,
-        display_res=args.display_res, tile_res=args.tile_res, names=args.names)
+        display_res=args.display_res, tile_res=args.tile_res, names=args.names,
+        stretch=args.stretch)
 
 
 if __name__ == "__main__":

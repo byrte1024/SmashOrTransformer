@@ -79,17 +79,19 @@ def _parse_drop(data: str) -> list[Path]:
     return out
 
 
-def score_file(model, cfg, calib, path, device="cuda", threshold=0.5):
+def score_file(model, cfg, calib, path, device="cuda", threshold=0.5, stretch=True):
     """-> (raw_pct, calibrated_pct, smash_bool) for one image."""
-    cal = score_image(model, cfg, path, device=device, calib=calib)
-    raw = score_image(model, cfg, path, device=device, calib=None)
+    cal = score_image(model, cfg, path, device=device, calib=calib, stretch=stretch)
+    raw = score_image(model, cfg, path, device=device, calib=None, stretch=stretch)
     return raw, cal, cal >= threshold * 100
 
 
 def build_result_image(model, cfg, calib, path, device="cuda", threshold=0.5,
-                       display_res=384):
-    """-> (labeled PIL image with SMASH/PASS banner, raw_pct, cal_pct, smash)."""
-    raw, cal, smash = score_file(model, cfg, calib, path, device=device, threshold=threshold)
+                       display_res=384, stretch=True):
+    """-> (labeled PIL image with SMASH/PASS banner, raw_pct, cal_pct, smash).
+    Model input is stretch-to-square (default); the shown image stays aspect-fit."""
+    raw, cal, smash = score_file(model, cfg, calib, path, device=device,
+                                 threshold=threshold, stretch=stretch)
     disp = canonical_render(load_sprite(path), display_res)
     return annotate_portrait(disp, cal, smash), raw, cal, smash
 
@@ -97,7 +99,8 @@ def build_result_image(model, cfg, calib, path, device="cuda", threshold=0.5,
 # --------------------------------------------------------------------------- #
 # GUI
 # --------------------------------------------------------------------------- #
-def _run_gui(runs_dir, device, threshold, initial_checkpoint=None, display_res=384):
+def _run_gui(runs_dir, device, threshold, initial_checkpoint=None, display_res=384,
+             stretch=True):
     import pygame
     pygame.init()
     SW = display_res + 300
@@ -187,7 +190,8 @@ def _run_gui(runs_dir, device, threshold, initial_checkpoint=None, display_res=3
         path = st["images"][st["idx"]]
         try:
             img, raw, cal, smash = build_result_image(st["model"], st["cfg"], st["calib"],
-                                                      path, device, threshold, display_res)
+                                                      path, device, threshold, display_res,
+                                                      stretch)
         except Exception as ex:
             st["result"], st["surf"] = None, None
             st["status"] = f"cannot read {path.name}: {ex}"
@@ -313,8 +317,11 @@ def main(argv=None):
     p.add_argument("--runs", default="runs", help="directory of model runs to discover")
     p.add_argument("--device", default="cuda")
     p.add_argument("--threshold", type=float, default=0.5)
+    p.add_argument("--stretch", action=argparse.BooleanOptionalAction, default=True,
+                   help="stretch-to-square model input (default) vs aspect-fit (--no-stretch)")
     args = p.parse_args(argv)
-    _run_gui(args.runs, args.device, args.threshold, initial_checkpoint=args.checkpoint)
+    _run_gui(args.runs, args.device, args.threshold, initial_checkpoint=args.checkpoint,
+             stretch=args.stretch)
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ import torch
 from data_prep.prepare import load_sprite
 from .config import TrainConfig
 from .model import SmashRanker
-from .dataset import canonical_render, to_tensor
+from .dataset import render_input, to_tensor
 
 
 def load_calibration(checkpoint_path, fit: str = "auto"):
@@ -35,10 +35,11 @@ def load_model(checkpoint_path, device="cuda", pretrained: bool = False):
     return model, cfg
 
 
-def score_image(model, cfg: TrainConfig, image_path, device="cuda", calib=None) -> float:
+def score_image(model, cfg: TrainConfig, image_path, device="cuda", calib=None,
+                stretch=True) -> float:
     dev = torch.device(device if (device != "cuda" or torch.cuda.is_available()) else "cpu")
     sprite = load_sprite(image_path)
-    img = canonical_render(sprite, cfg.resolution)
+    img = render_input(sprite, cfg.resolution, stretch)
     t = to_tensor(img, model.data_config["mean"], model.data_config["std"])
     t = t.unsqueeze(0).to(dev)
     with torch.no_grad():
@@ -55,13 +56,17 @@ def main(argv=None):
     p.add_argument("--calibration", default="auto",
                    choices=["auto", "none", "train", "val", "combined"],
                    help="which calibration map to apply (auto=file default; none=raw)")
+    p.add_argument("--stretch", action=argparse.BooleanOptionalAction, default=True,
+                   help="stretch-to-square model input (default) vs aspect-fit (--no-stretch)")
     p.add_argument("images", nargs="+")
     args = p.parse_args(argv)
     model, cfg = load_model(args.checkpoint, device=args.device, pretrained=False)
     calib = load_calibration(args.checkpoint, fit=args.calibration)
     tag = "raw" if calib is None else f"calibrated:{args.calibration}"
     for path in args.images:
-        print(f"{path}: {score_image(model, cfg, path, device=args.device, calib=calib):.1f} [{tag}]")
+        score = score_image(model, cfg, path, device=args.device, calib=calib,
+                            stretch=args.stretch)
+        print(f"{path}: {score:.1f} [{tag}]")
 
 
 if __name__ == "__main__":

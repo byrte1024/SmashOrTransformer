@@ -24,7 +24,7 @@ import torch
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 from data_prep.imagestore import DatasetImages
-from .dataset import canonical_render, to_tensor
+from .dataset import canonical_render, render_input, to_tensor
 from .metrics import spearman
 from .infer import load_model
 from .calibrate import apply_calibration
@@ -96,11 +96,11 @@ def annotate_avg(portrait_rgb, avg_pct, smash, per_image, spread_pct, lo_pct,
     return canvas
 
 
-def _score_rows(model, images, res, mean, std, device, batch_size):
+def _score_rows(model, images, res, mean, std, device, batch_size, stretch=True):
     preds = np.empty(len(images), dtype=float)
     for start in tqdm(range(0, len(images), batch_size), desc="scoring", unit="batch"):
         rows = range(start, min(len(images), start + batch_size))
-        x = torch.stack([to_tensor(canonical_render(images[r], res), mean, std)
+        x = torch.stack([to_tensor(render_input(images[r], res, stretch), mean, std)
                          for r in rows]).to(device)
         with torch.no_grad():
             preds[start:start + len(x)] = torch.sigmoid(model(x)).cpu().numpy()
@@ -124,7 +124,8 @@ def _calibrate_per_split(raw, pid, val_set, maps, mode):
 
 
 def run(checkpoint_path, dataset_dir=None, device="cuda", out_dir="results",
-        threshold=0.5, display_res=384, batch_size=64, calibration="per-split") -> Path:
+        threshold=0.5, display_res=384, batch_size=64, calibration="per-split",
+        stretch=True) -> Path:
     model, cfg = load_model(checkpoint_path, device=device, pretrained=False)
     dev = next(model.parameters()).device
     dataset_dir = dataset_dir or cfg.dataset_dir
@@ -139,7 +140,7 @@ def run(checkpoint_path, dataset_dir=None, device="cuda", out_dir="results",
     val_set = set(int(pid[i]) for i in
                   json.loads((Path(dataset_dir) / "split.json").read_text())["val"])
 
-    raw = _score_rows(model, images, cfg.resolution, mean, std, dev, batch_size)
+    raw = _score_rows(model, images, cfg.resolution, mean, std, dev, batch_size, stretch)
     cal = _calibrate_per_split(raw, pid, val_set, maps, calibration)   # per-image [0,1]
 
     out = Path(out_dir)
@@ -227,10 +228,12 @@ def main(argv=None):
                    choices=["per-split", "val", "train", "combined", "none"],
                    help="per-split (default): train map for train mons, val map "
                         "for val mons -- avoids the domain-saturation artifact")
+    p.add_argument("--stretch", action=argparse.BooleanOptionalAction, default=True,
+                   help="stretch-to-square model input (default) vs aspect-fit (--no-stretch)")
     args = p.parse_args(argv)
     run(args.checkpoint, dataset_dir=args.dataset_dir, device=args.device,
         out_dir=args.out, threshold=args.threshold, display_res=args.display_res,
-        batch_size=args.batch_size, calibration=args.calibration)
+        batch_size=args.batch_size, calibration=args.calibration, stretch=args.stretch)
 
 
 if __name__ == "__main__":
