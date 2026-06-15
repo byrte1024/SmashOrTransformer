@@ -259,3 +259,14 @@ def test_model_loader_reloads_on_stamp_change_same_path():
     s["v"] = 2                              # e.g. calibration.json regenerated
     _, _, r = loader.get()
     assert r and n["c"] == 2                # reloaded -> picks up new calibration
+
+
+def test_stretch_square_fills_square_vs_canonical_pads():
+    from model.dataset import canonical_render
+    # tall opaque sprite: stretch fills the whole square; canonical pads with white
+    arr = np.zeros((40, 10, 4), dtype=np.uint8); arr[:, :] = (200, 50, 50, 255)
+    stretched = bot.stretch_square(arr, 16)
+    assert stretched.shape == (16, 16, 3)
+    assert (stretched == (200, 50, 50)).all()          # no white bars -> distorted to fill
+    canon = canonical_render(arr, 16)
+    assert (canon == 255).any()                        # canonical leaves white padding

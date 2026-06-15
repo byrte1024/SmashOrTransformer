@@ -123,10 +123,21 @@ def _rgba_from_bytes(data: bytes) -> np.ndarray:
     return np.asarray(im.convert("RGBA"), dtype=np.uint8)
 
 
+def stretch_square(rgba, res) -> np.ndarray:
+    """Stretch (distort) the image to a res x res square on white -> RGB uint8.
+    Used for the MODEL input so it always sees a filled square; the displayed
+    image keeps the aspect-preserving canonical render (stretch looks bad)."""
+    im = Image.fromarray(rgba, "RGBA").resize((res, res), Image.BILINEAR)
+    bg = Image.new("RGB", (res, res), (255, 255, 255))
+    bg.paste(im, (0, 0), im)
+    return np.asarray(bg, dtype=np.uint8)
+
+
 def rate_bytes(model, cfg, calib, data, device="cuda", threshold=0.5, display_res=384):
-    """Score raw image bytes. -> (raw_pct, cal_pct, smash_bool, labeled_png_bytes)."""
+    """Score raw image bytes. -> (raw_pct, cal_pct, smash_bool, labeled_png_bytes).
+    Model sees a stretch-to-square input; the shared image uses canonical render."""
     rgba = _rgba_from_bytes(data)
-    x = to_tensor(canonical_render(rgba, cfg.resolution),
+    x = to_tensor(stretch_square(rgba, cfg.resolution),
                   model.data_config["mean"], model.data_config["std"]).unsqueeze(0).to(device)
     with torch.no_grad():
         raw = float(torch.sigmoid(model(x).reshape(-1)[0]))
