@@ -25,7 +25,7 @@ from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 from .dataset import canonical_render, to_tensor
 from .metrics import spearman
-from .infer import load_model, load_calibration
+from .infer import load_model
 from .calibrate import apply_calibration
 
 GREEN = (40, 170, 70)
@@ -106,13 +106,30 @@ def _score_rows(model, images, res, mean, std, device, batch_size):
     return preds
 
 
+def _calibrate_per_split(raw, pid, val_set, maps, mode):
+    """Return calibrated predictions. 'per-split' uses the train map for train
+    Pokemon and the val map for val Pokemon (each map only covers the regime it
+    was fit on -- applying one global map to the other regime saturates at its
+    domain edges). Other modes apply a single named map; 'none' is identity."""
+    if maps is None or mode == "none":
+        return raw.copy()
+    if mode == "per-split":
+        is_val = np.array([int(p) in val_set for p in pid])
+        cal = raw.copy()
+        cal[is_val] = apply_calibration(raw[is_val], maps["val"]["xs"], maps["val"]["ys"])
+        cal[~is_val] = apply_calibration(raw[~is_val], maps["train"]["xs"], maps["train"]["ys"])
+        return cal
+    return apply_calibration(raw, maps[mode]["xs"], maps[mode]["ys"])
+
+
 def run(checkpoint_path, dataset_dir=None, device="cuda", out_dir="results",
-        threshold=0.5, display_res=384, batch_size=64) -> Path:
+        threshold=0.5, display_res=384, batch_size=64, calibration="per-split") -> Path:
     model, cfg = load_model(checkpoint_path, device=device, pretrained=False)
     dev = next(model.parameters()).device
     dataset_dir = dataset_dir or cfg.dataset_dir
     mean, std = model.data_config["mean"], model.data_config["std"]
-    calib = load_calibration(checkpoint_path, fit="auto")
+    cpath = Path(checkpoint_path).parent / "calibration.json"
+    maps = json.loads(cpath.read_text())["maps"] if cpath.exists() else None
 
     d = np.load(Path(dataset_dir) / "data.npz", allow_pickle=True)
     images, pid, name, smash = (d["images"], d["pokemon_id"], d["source_name"],
@@ -121,7 +138,7 @@ def run(checkpoint_path, dataset_dir=None, device="cuda", out_dir="results",
                   json.loads((Path(dataset_dir) / "split.json").read_text())["val"])
 
     raw = _score_rows(model, images, cfg.resolution, mean, std, dev, batch_size)
-    cal = apply_calibration(raw, *calib) if calib else raw   # per-image calibrated [0,1]
+    cal = _calibrate_per_split(raw, pid, val_set, maps, calibration)   # per-image [0,1]
 
     out = Path(out_dir)
     (out / "portrait").mkdir(parents=True, exist_ok=True)
@@ -204,10 +221,14 @@ def main(argv=None):
     p.add_argument("--threshold", type=float, default=0.5)
     p.add_argument("--display-res", type=int, default=384)
     p.add_argument("--batch-size", type=int, default=64)
+    p.add_argument("--calibration", default="per-split",
+                   choices=["per-split", "val", "train", "combined", "none"],
+                   help="per-split (default): train map for train mons, val map "
+                        "for val mons -- avoids the domain-saturation artifact")
     args = p.parse_args(argv)
     run(args.checkpoint, dataset_dir=args.dataset_dir, device=args.device,
         out_dir=args.out, threshold=args.threshold, display_res=args.display_res,
-        batch_size=args.batch_size)
+        batch_size=args.batch_size, calibration=args.calibration)
 
 
 if __name__ == "__main__":

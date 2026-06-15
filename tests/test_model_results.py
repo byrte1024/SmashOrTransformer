@@ -60,3 +60,33 @@ def test_results_run_writes_folders_and_csvs(mini_repo, tmp_path):
     total_imgs = len(np.load(f"{ds}/data.npz", allow_pickle=True)["pokemon_id"])
     assert len(per) == total_imgs               # one row per image
     assert {"pokemon_id", "source_name", "raw_pct", "calibrated_pct", "smash"} == set(per[0].keys())
+
+
+def test_per_split_calibration_avoids_saturation():
+    from model.results import _calibrate_per_split
+    # val map: narrow domain [0.1,0.4] -> [0.1,0.8]; train map: wide identity-ish
+    maps = {"val": {"xs": [0.1, 0.4], "ys": [0.1, 0.8]},
+            "train": {"xs": [0.1, 0.8], "ys": [0.1, 0.8]}}
+    raw = np.array([0.7])           # a TRAIN pokemon whose raw exceeds the val domain
+    pid = np.array([1]); val_set = set()
+    # a global val map clamps 0.7 to its 0.8 ceiling (the saturation bug)
+    assert abs(_calibrate_per_split(raw, pid, val_set, maps, "val")[0] - 0.8) < 1e-9
+    # per-split routes it through the train map -> ~0.7, no saturation
+    assert abs(_calibrate_per_split(raw, pid, val_set, maps, "per-split")[0] - 0.7) < 1e-9
+
+
+def test_per_split_uses_val_map_for_val_pokemon():
+    from model.results import _calibrate_per_split
+    maps = {"val": {"xs": [0.1, 0.4], "ys": [0.1, 0.8]},
+            "train": {"xs": [0.1, 0.8], "ys": [0.1, 0.8]}}
+    raw = np.array([0.25]); pid = np.array([9]); val_set = {9}
+    # val pokemon raw 0.25 -> val map midpoint ~0.45, not the train-map's ~0.25
+    cal = _calibrate_per_split(raw, pid, val_set, maps, "per-split")[0]
+    assert 0.4 < cal < 0.5
+
+
+def test_calibration_none_is_identity():
+    from model.results import _calibrate_per_split
+    raw = np.array([0.3, 0.7])
+    out = _calibrate_per_split(raw, np.array([1, 2]), set(), None, "none")
+    assert np.allclose(out, raw)
