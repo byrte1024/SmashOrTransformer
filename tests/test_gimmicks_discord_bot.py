@@ -93,3 +93,70 @@ def test_read_model_path(tmp_path):
     assert bot.read_model_path(f) == "runs/vit_small/checkpoints/best.pt"
     with pytest.raises(FileNotFoundError):
         bot.read_model_path(tmp_path / "nope.txt")
+
+
+def _png_bytes(color):
+    from PIL import Image
+    buf = BytesIO()
+    Image.new("RGB", (32, 32), color).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_load_settings_default_and_override(tmp_path):
+    assert bot.load_settings(tmp_path / "nope.json")["light_llm"] is False
+    f = tmp_path / "settings.json"
+    f.write_text('{"light_llm": true}')
+    s = bot.load_settings(f)
+    assert s["light_llm"] is True and s["llm_model"] == "claude-haiku-4-5"  # default kept
+
+
+def test_ahash_same_and_different():
+    a, a2 = _png_bytes((200, 30, 30)), _png_bytes((200, 30, 30))
+    b = _png_bytes((30, 30, 200))
+    assert bot.ahash(a) == bot.ahash(a2)            # identical -> same hash
+    # flat-color images all hash to 0; use structured images to show difference
+    from PIL import Image, ImageDraw
+    def structured(side):
+        im = Image.new("L", (32, 32), 0); d = ImageDraw.Draw(im)
+        d.rectangle([0, 0, 15, 31] if side else [16, 0, 31, 31], fill=255)
+        buf = BytesIO(); im.save(buf, format="PNG"); return buf.getvalue()
+    assert bot.ahash(structured(True)) != bot.ahash(structured(False))
+
+
+def test_build_prompt_diss_vs_compliment_and_markers():
+    s = bot.build_prompt("/tmp/x.png", 82, True)
+    p = bot.build_prompt("/tmp/x.png", 7, False)
+    assert "COMPLIMENT" in s and "DISS" in p
+    for txt in (s, p):
+        assert "ASCII" in txt and "~?" in txt and "?~" in txt
+
+
+def test_parse_reply_extracts_strips_and_falls_back():
+    assert bot.parse_reply("blah blah ~? you look great ?~ trailing") == "you look great"
+    assert bot.parse_reply("no markers here, just text") == "no markers here, just text"
+    assert bot.parse_reply("~? cafe ☕ vibes ?~") == "cafe  vibes"   # non-ascii stripped
+    assert bot.parse_reply("") is None
+    assert bot.parse_reply("~?   ?~") is None
+
+
+def test_explain_uses_cli_output_and_handles_failure(monkeypatch):
+    monkeypatch.setattr(bot, "_run_claude", lambda cmd, timeout: "junk ~? lookin sharp ?~ end")
+    assert bot.explain("/tmp/x.png", 80, True) == "lookin sharp"
+    def boom(cmd, timeout):
+        raise RuntimeError("no cli")
+    monkeypatch.setattr(bot, "_run_claude", boom)
+    assert bot.explain("/tmp/x.png", 80, True) is None
+
+
+def test_get_explanation_caches(tmp_path, monkeypatch):
+    cache = bot.ExplanationCache(tmp_path / "c.json")
+    calls = {"n": 0}
+    def fake_explain(path, cal, smash, model="x"):
+        calls["n"] += 1
+        return "cached line"
+    monkeypatch.setattr(bot, "explain", fake_explain)
+    data = _png_bytes((10, 120, 200))
+    assert bot.get_explanation(cache, data, 60, True, "m") == "cached line"
+    assert bot.get_explanation(cache, data, 60, True, "m") == "cached line"  # 2nd from cache
+    assert calls["n"] == 1                          # explain invoked once
+    assert (tmp_path / "c.json").exists()           # persisted

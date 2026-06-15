@@ -20,6 +20,12 @@ which are unit-tested) import without it / headlessly.
 from __future__ import annotations
 import argparse
 import asyncio
+import json
+import os
+import re
+import shutil
+import subprocess
+import tempfile
 from io import BytesIO
 from pathlib import Path
 import numpy as np
@@ -111,12 +117,123 @@ HELP = ("ping me with an image, reply to one, say `me` for your own pfp, or "
 
 
 # --------------------------------------------------------------------------- #
+# settings + "light LLM" explanation (local Haiku via the claude CLI, cached)
+# --------------------------------------------------------------------------- #
+_DEFAULT_SETTINGS = {"light_llm": False, "llm_model": "claude-haiku-4-5"}
+
+
+def load_settings(path) -> dict:
+    """Load bot settings (defaults merged). 'light_llm' toggles the Haiku
+    explanation; 'llm_model' picks the model."""
+    s = dict(_DEFAULT_SETTINGS)
+    p = Path(path)
+    if p.exists():
+        s.update(json.loads(p.read_text()))
+    return s
+
+
+def ahash(data: bytes) -> str:
+    """8x8 average hash -> 16-hex string. Near-identical images share a hash,
+    so the explanation cache reuses across 'similar' images."""
+    im = Image.open(BytesIO(data)).convert("L").resize((8, 8))
+    arr = np.asarray(im, dtype=np.float64).flatten()
+    avg = arr.mean()
+    bits = "".join("1" if p > avg else "0" for p in arr)
+    return f"{int(bits, 2):016x}"
+
+
+class ExplanationCache:
+    """Tiny JSON-backed cache: ahash(+verdict) -> explanation text."""
+    def __init__(self, path):
+        self.path = Path(path)
+        self.data = json.loads(self.path.read_text()) if self.path.exists() else {}
+
+    def get(self, key):
+        return self.data.get(key)
+
+    def put(self, key, value):
+        self.data[key] = value
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(self.data, indent=2))
+
+
+def build_prompt(image_path, cal_pct, smash) -> str:
+    mood = ("a short, witty COMPLIMENT" if smash else "a short, playful DISS")
+    return (f"Look at the image at {image_path}. A model rated it {cal_pct:.0f}% "
+            f"'smashable' ({'SMASH' if smash else 'PASS'}). Give {mood} about how it "
+            f"looks that explains the rating. Rules: ONE short sentence, ASCII "
+            f"characters only, no emoji. Output ONLY the sentence wrapped exactly as "
+            f"~? your sentence here ?~ with nothing before or after.")
+
+
+_REPLY_RE = re.compile(r"~\?(.*?)\?~", re.S)
+
+
+def parse_reply(raw):
+    """Extract the message between ~? and ?~ (fall back to the whole text if the
+    markers are missing), strip non-ASCII, and return it (or None if empty)."""
+    if not raw:
+        return None
+    m = _REPLY_RE.search(raw)
+    msg = (m.group(1) if m else raw).strip()
+    msg = msg.encode("ascii", "ignore").decode().strip()
+    return msg or None
+
+
+def _run_claude(cmd, timeout) -> str:
+    if shutil.which(cmd[0]) is None:
+        raise FileNotFoundError(f"{cmd[0]} CLI not found on PATH")
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    if r.returncode != 0:
+        raise RuntimeError((r.stderr or "claude failed").strip()[:200])
+    return r.stdout
+
+
+def explain(image_path, cal_pct, smash, model="claude-haiku-4-5", timeout=90):
+    """Fire a quick local Haiku (claude CLI) to diss/compliment the image.
+    Best-effort: returns the parsed one-liner, or None on any failure."""
+    cmd = ["claude", "-p", build_prompt(image_path, cal_pct, smash),
+           "--model", model, "--allowedTools", "Read"]
+    try:
+        out = _run_claude(cmd, timeout)
+    except Exception:
+        return None
+    return parse_reply(out)
+
+
+def get_explanation(cache, data, cal_pct, smash, model):
+    """Cached explanation for the image bytes (writes a temp file for the CLI)."""
+    key = f"{ahash(data)}:{int(bool(smash))}"
+    if cache is not None and (hit := cache.get(key)) is not None:
+        return hit
+    fd, tmp = tempfile.mkstemp(suffix=".png")
+    os.close(fd)
+    try:
+        Path(tmp).write_bytes(data)
+        exp = explain(tmp, cal_pct, smash, model=model)
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+    if exp and cache is not None:
+        cache.put(key, exp)
+    return exp
+
+
+# --------------------------------------------------------------------------- #
 # discord wiring (lazy import; needs a token + gateway)
 # --------------------------------------------------------------------------- #
-def run(checkpoint_path, token_path="gimmicks/secret.txt", device="cuda", threshold=0.5):
+def run(checkpoint_path, token_path="gimmicks/secret.txt", device="cuda", threshold=0.5,
+        settings_path="gimmicks/settings.json", light_llm=None,
+        cache_path="gimmicks/llm_cache.json"):
     import discord
 
     token = read_token(token_path)
+    settings = load_settings(settings_path)
+    use_llm = settings["light_llm"] if light_llm is None else light_llm
+    llm_model = settings["llm_model"]
+    cache = ExplanationCache(cache_path) if use_llm else None
     model, cfg = load_model(checkpoint_path, device=device, pretrained=False)
     calib = load_calibration(checkpoint_path, fit="auto")
     dev = next(model.parameters()).device
@@ -172,8 +289,12 @@ def run(checkpoint_path, token_path="gimmicks/secret.txt", device="cuda", thresh
         async with message.channel.typing():
             raw, cal, smash, png = await asyncio.to_thread(
                 rate_bytes, model, cfg, calib, data, dev, threshold)
-        await message.reply(verdict_text(label, cal, smash),
-                            file=discord.File(BytesIO(png), filename="rating.png"))
+            text = verdict_text(label, cal, smash)
+            if use_llm:
+                exp = await asyncio.to_thread(get_explanation, cache, data, cal, smash, llm_model)
+                if exp:
+                    text += f"\n> {exp}"
+        await message.reply(text, file=discord.File(BytesIO(png), filename="rating.png"))
 
     client.run(token)
 
@@ -186,11 +307,16 @@ def main(argv=None):
     p.add_argument("--checkpoint", default=None,
                    help="override the path in thebestofthebest.txt")
     p.add_argument("--token", default=str(here / "secret.txt"))
+    p.add_argument("--settings", default=str(here / "settings.json"))
+    p.add_argument("--light-llm", dest="light_llm", action="store_true", default=None,
+                   help="force-enable the Haiku explanation (overrides settings.json)")
     p.add_argument("--device", default="cuda")
     p.add_argument("--threshold", type=float, default=0.5)
     args = p.parse_args(argv)
     checkpoint = args.checkpoint or read_model_path(args.model_file)
-    run(checkpoint, token_path=args.token, device=args.device, threshold=args.threshold)
+    run(checkpoint, token_path=args.token, device=args.device, threshold=args.threshold,
+        settings_path=args.settings, light_llm=args.light_llm,
+        cache_path=str(here / "llm_cache.json"))
 
 
 if __name__ == "__main__":

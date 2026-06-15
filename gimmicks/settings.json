@@ -1,0 +1,4 @@
+{
+  "light_llm": false,
+  "llm_model": "claude-haiku-4-5"
+}
