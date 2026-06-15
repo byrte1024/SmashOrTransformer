@@ -24,7 +24,8 @@ from .infer import load_model
 from .calibrate import apply_calibration
 from .results import _banner          # reuse the green/red banner drawer
 
-_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
+_EXTS = {".png", ".jpg", ".jpeg", ".jfif", ".jpe", ".webp", ".bmp", ".gif",
+         ".tif", ".tiff", ".ico", ".ppm", ".pgm"}
 
 
 def _gather(source) -> list[Path]:

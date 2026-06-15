@@ -35,16 +35,17 @@ def test_find_models_and_checkpoints(tmp_path):
 
 
 def test_list_images_filters_and_sorts(tmp_path):
-    (tmp_path / "b.png").write_bytes(b"x")
-    (tmp_path / "a.jpg").write_bytes(b"x")
-    (tmp_path / "notes.txt").write_text("nope")
-    assert [p.name for p in app.list_images(str(tmp_path))] == ["a.jpg", "b.png"]
+    for n in ("b.png", "a.jpg", "c.jfif", "d.gif", "e.tiff", "notes.txt", "skip.psd"):
+        (tmp_path / n).write_bytes(b"x")
+    # all supported formats kept (sorted); txt/psd dropped
+    assert [p.name for p in app.list_images(str(tmp_path))] == \
+        ["a.jpg", "b.png", "c.jfif", "d.gif", "e.tiff"]
 
 
-def test_parse_drop_handles_braces_and_multiple():
-    data = "{/tmp/a b/img one.png} /tmp/two.jpg /tmp/skip.txt"
+def test_parse_drop_handles_braces_multiple_and_new_formats():
+    data = "{/tmp/a b/img one.png} /tmp/two.jfif /tmp/three.gif /tmp/skip.txt"
     out = app._parse_drop(data)
-    assert [p.name for p in out] == ["img one.png", "two.jpg"]   # txt dropped
+    assert [p.name for p in out] == ["img one.png", "two.jfif", "three.gif"]   # txt dropped
 
 
 def _trained(mini_repo, tmp_path):
@@ -81,3 +82,12 @@ def test_score_file_and_build_result_image(mini_repo, tmp_path):
     # also discoverable as a model by find_models/find_checkpoints
     models = app.find_models(str(tmp_path / "runs"))
     assert any(name == "app" for name, _ in models)
+
+    # gif -> first frame (mini_repo has a 2-frame showdown.gif); jfif (JPEG variant)
+    gif = mini_repo["images"] / "1" / "showdown.gif"
+    g_img, _, _, _ = app.build_result_image(model, cfg, calib, gif, device="cpu", display_res=64)
+    assert isinstance(g_img, Image.Image)
+    jfif = tmp_path / "pic.jfif"
+    Image.new("RGB", (50, 40), (200, 100, 50)).save(jfif, format="JPEG")
+    j_img, _, _, _ = app.build_result_image(model, cfg, calib, jfif, device="cpu", display_res=64)
+    assert isinstance(j_img, Image.Image)

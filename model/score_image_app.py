@@ -25,7 +25,10 @@ from .dataset import canonical_render
 from .infer import load_model, load_calibration, score_image
 from .results import annotate_portrait
 
-_IMG_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
+# formats Pillow opens; animated ones (gif/webp) use their first frame via
+# load_sprite. jfif/jpe are JPEG variants.
+_IMG_EXTS = {".png", ".jpg", ".jpeg", ".jfif", ".jpe", ".webp", ".bmp", ".gif",
+             ".tif", ".tiff", ".ico", ".ppm", ".pgm"}
 
 
 # --------------------------------------------------------------------------- #
@@ -164,7 +167,8 @@ def _run_gui(runs_dir, device, threshold, initial_checkpoint=None, display_res=3
             r = tk.Tk(); r.withdraw()
             p = filedialog.askopenfilename(
                 title="Pick an image",
-                filetypes=[("Images", "*.png *.jpg *.jpeg *.webp *.bmp *.gif"), ("All", "*.*")])
+                filetypes=[("Images", "*.png *.jpg *.jpeg *.jfif *.jpe *.webp *.bmp "
+                            "*.gif *.tif *.tiff *.ico *.ppm *.pgm"), ("All", "*.*")])
             r.destroy()
             if p:
                 set_images([p])
@@ -181,8 +185,13 @@ def _run_gui(runs_dir, device, threshold, initial_checkpoint=None, display_res=3
             st["status"] = "select a model first"
             return
         path = st["images"][st["idx"]]
-        img, raw, cal, smash = build_result_image(st["model"], st["cfg"], st["calib"],
-                                                  path, device, threshold, display_res)
+        try:
+            img, raw, cal, smash = build_result_image(st["model"], st["cfg"], st["calib"],
+                                                      path, device, threshold, display_res)
+        except Exception as ex:
+            st["result"], st["surf"] = None, None
+            st["status"] = f"cannot read {path.name}: {ex}"
+            return
         st["result"] = img
         st["surf"] = to_surface(img)
         st["status"] = (f"raw {raw:.1f}%   calibrated {cal:.1f}%   "
