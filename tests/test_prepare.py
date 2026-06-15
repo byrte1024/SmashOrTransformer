@@ -55,3 +55,19 @@ def test_stats_has_label_histogram(mini_repo):
     assert "label_histogram" in stats
     assert len(stats["label_histogram"]["counts"]) == 10
     assert len(stats["label_histogram"]["bins"]) == 11
+
+
+def test_prepare_skips_unreadable_image(mini_repo):
+    # corrupt one selected image; prepare must skip it, not crash, and record it
+    bad = mini_repo["images"] / "1" / "gen1_red-blue.png"
+    bad.write_bytes(b"\x89PNG\r\n\x1a\n garbage not a real png")
+    cfg = DataConfig.from_dict({"name": "skip", "resolution": 16})
+    out = prepare(cfg, mini_repo["images"], mini_repo["labels"],
+                  mini_repo["root"] / "datasets")
+    stats = json.loads((out / "stats.json").read_text())
+    assert stats["n_skipped_unreadable"] == 1
+    assert stats["skipped_unreadable"][0]["path"].endswith("gen1_red-blue.png")
+    # the corrupt file is absent from the dataset; the rest are present
+    data = np.load(out / "data.npz", allow_pickle=True)
+    assert "gen1_red-blue" not in set(data["source_name"].tolist())
+    assert stats["n_images"] > 0

@@ -8,6 +8,7 @@ import torch
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 from data_prep.sampler import DataSampler
 from .config import TrainConfig
 from .model import SmashRanker
@@ -73,7 +74,9 @@ def run(cfg: TrainConfig, pretrained: bool = True) -> Path:
         model.train()
         ep_start = time.perf_counter()
         loss_sum, n_samples, grad_norm_sum, n_batches = 0.0, 0, 0.0, 0
-        for t, y in train_loader:
+        loop = tqdm(train_loader, desc=f"epoch {epoch + 1}/{cfg.epochs} [{phase}]",
+                    unit="batch", leave=True)
+        for t, y in loop:
             t = t.to(device); y = y.to(device)
             optimizer.zero_grad()
             with torch.autocast(device_type=device.type, dtype=torch.bfloat16,
@@ -83,9 +86,11 @@ def run(cfg: TrainConfig, pretrained: bool = True) -> Path:
             loss.backward()
             gn = torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
             optimizer.step()
-            loss_sum += loss.detach().item() * len(y)
+            batch_loss = loss.detach().item()
+            loss_sum += batch_loss * len(y)
             n_samples += len(y)
             grad_norm_sum += float(gn); n_batches += 1
+            loop.set_postfix(loss=f"{batch_loss:.4f}")
         scheduler.step()
 
         val = evaluate(model, val_loader, device)

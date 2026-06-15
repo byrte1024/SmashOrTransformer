@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import numpy as np
 from PIL import Image, ImageSequence
+from tqdm import tqdm
 from .config import DataConfig
 from .selection import load_labels, load_records, select_pokemon
 from .splits import build_split
@@ -24,22 +25,33 @@ def prepare(cfg: DataConfig, images_dir, labels_csv, out_root) -> Path:
 
     images, pid_arr, cat_arr, gen_arr, name_arr = [], [], [], [], []
     smash_arr, votes_arr = [], []
-    manifest_rows, reports = [], {}
+    manifest_rows, reports, skipped = [], {}, []
 
-    for pid in sorted(labels.keys()):
+    for pid in tqdm(sorted(labels.keys()), desc="Building dataset", unit="pkmn"):
         recs = load_records(images_dir, pid, labels)
         if not recs:
             continue
         kept, report = select_pokemon(cfg, recs)
         reports[pid] = report
         for r in kept:
-            images.append(load_sprite(r.path))
+            try:
+                arr = load_sprite(r.path)
+            except Exception as e:
+                # a few downloaded sprites are corrupt/undecodable; skip them
+                # rather than aborting the whole build (recorded in stats).
+                skipped.append({"path": str(r.path), "error": type(e).__name__})
+                continue
+            images.append(arr)
             pid_arr.append(pid); cat_arr.append(r.category); gen_arr.append(r.gen)
             name_arr.append(r.source_name)
             smash_arr.append(r.smash_pct); votes_arr.append(r.total_votes)
             manifest_rows.append({"pokemon_id": pid, "source_name": r.source_name,
                                   "category": r.category, "gen": r.gen,
                                   "smash_pct": r.smash_pct, "total_votes": r.total_votes})
+
+    if skipped:
+        print(f"warning: skipped {len(skipped)} unreadable image(s); "
+              "see stats.json 'skipped_unreadable'")
 
     if not images:
         raise ValueError(
@@ -82,6 +94,7 @@ def prepare(cfg: DataConfig, images_dir, labels_csv, out_root) -> Path:
         {"n_images": len(images), "n_pokemon": len(counts),
          "per_pokemon_counts": counts,
          "label_histogram": {"bins": hist_edges.tolist(), "counts": hist_counts.tolist()},
+         "n_skipped_unreadable": len(skipped), "skipped_unreadable": skipped,
          "selection_reports": reports}, indent=2))
 
     return out
