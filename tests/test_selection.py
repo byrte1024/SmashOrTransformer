@@ -117,4 +117,6 @@ def test_booru_subfolder_images_are_excluded(mini_repo, tmp_path):
     # only the top-level sprites are seen; nothing from the booru/ subfolder
     assert names == {"official-artwork", "home", "gen1_red-blue",
                      "gen9_scarlet-violet", "showdown"}
-    assert all("booru" not in str(r.path) and "999" not in r.source_name for r in recs)
+    # no record comes from the booru/ subfolder
+    assert all(r.path.parent.name != "booru" for r in recs)
+    assert "00_999" not in names
