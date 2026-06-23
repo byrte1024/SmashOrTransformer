@@ -29,6 +29,20 @@ uv run pytest -q        # sanity-check the install (CPU-only, no GPU needed)
 Training/inference default to CUDA (`--device cuda`); pass `--device cpu` to
 force CPU. The pinned PyTorch is a CUDA 13.0 build.
 
+### Pretrained weights
+
+To skip training, download published checkpoints into `runs/` (so all the
+scoring CLIs find them):
+
+```bash
+uv run python download_models.py            # recommended model (vit_small_mixed_v1)
+uv run python download_models.py --all      # all checkpoints
+uv run python download_models.py --dataset  # + the mixed_v1 dataset (~11 GB)
+```
+
+See [MODELS.md](MODELS.md) for the model comparison and
+[docs/RELEASE.md](docs/RELEASE.md) for how the artifacts are published.
+
 ### Repo layout
 
 | Path | What |

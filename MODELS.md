@@ -71,10 +71,15 @@ Calibration lives in `calibration.json` next to it; regenerate with
 
 ## Pretrained weights
 
-Download links will be added here as checkpoints are published.
+Fetch published checkpoints into `runs/` with the downloader (HF-hosted):
 
-<!--
-| Model | Spearman (all_avg) | Download |
-|-------|:---:|----------|
-| vit_small_mixed_v1 | 0.770 | <link> |
--->
+```bash
+uv run python download_models.py            # vit_small_mixed_v1 (recommended)
+uv run python download_models.py --all      # all three
+uv run python download_models.py --dataset  # + mixed_v1 dataset (~11 GB)
+```
+
+Hosting/upload details are in [docs/RELEASE.md](docs/RELEASE.md).
+
+- Models: [supernovayuli/smash-or-transformer](https://huggingface.co/supernovayuli/smash-or-transformer)
+- Dataset: [supernovayuli/smash-or-transformer-data](https://huggingface.co/datasets/supernovayuli/smash-or-transformer-data)

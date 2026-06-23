@@ -19,7 +19,19 @@ model index and [../README.md](../README.md) for the general workflow.
 - **Trained on:** 11,032 images across all 1,025 Pokemon (official artwork +
   in-game sprites only), each placed on a plain white canvas.
 - **Result:** validation Spearman **0.728**, Pearson 0.787, MAE 0.058.
+  (Fair cross-eval vs the other models: see [../MODELS.md](../MODELS.md).)
 - **Hardware/time:** single RTX 5070, ~17 s/epoch, ~8.7 min total (30 epochs).
+
+## Get the checkpoint
+
+Download the trained weights (skips the pipeline below):
+
+```bash
+uv run python download_models.py vit_small_portraits_v1   # -> runs/vit_small_portraits_v1/checkpoints/best.pt
+```
+
+It lands in `runs/vit_small_portraits_v1/checkpoints/` so the scoring CLIs find
+it with no flags. To build it yourself, follow the rest of this guide.
 
 ## Architecture
 

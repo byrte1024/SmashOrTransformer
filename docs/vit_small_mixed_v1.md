@@ -13,7 +13,21 @@ for the general workflow.
 - **Trained on:** 21,076 images across all 1,025 Pokemon (official artwork,
   in-game sprites, and Safebooru fan-art), composited onto varied backgrounds.
 - **Result:** validation Spearman **0.755**, Pearson 0.815, MAE 0.057.
+  (Fair cross-eval vs the other models: see [../MODELS.md](../MODELS.md).)
 - **Hardware/time:** single RTX 5070, ~82 s/epoch, ~38 min total (28 epochs).
+
+## Get the checkpoint
+
+Download the trained weights (recommended -- skips the full pipeline below):
+
+```bash
+uv run python download_models.py                # -> runs/vit_small_mixed_v1/checkpoints/best.pt (+ calibration)
+uv run python download_models.py --dataset      # also fetch this dataset (~11 GB) to retrain/inspect
+```
+
+It lands in `runs/vit_small_mixed_v1/checkpoints/` so every scoring CLI finds
+it with no flags. To build everything yourself instead, follow the rest of this
+guide (or jump to [Reproduce from scratch](#reproduce-from-scratch)).
 
 ## Architecture
 
